@@ -1016,9 +1016,12 @@ fn ui(f: &mut Frame, app: &mut App) {
     // Update and render background animation first (needs mutable borrow)
     app.update_animation(size);
 
+    // Get config reference after mutable borrow is done
+    let config = &app.config;
+
     // Clone config values we need to avoid borrow issues
-    let auto_scale = app.config.layout.auto_scale;
-    let render_help = app.config.help_text.enabled;
+    let auto_scale = config.layout.auto_scale;
+    let render_help = config.help_text.enabled;
 
     render_background_animation(f, app, size);
 
