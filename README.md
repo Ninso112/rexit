@@ -19,6 +19,7 @@ A **rice-ready** minimalist TUI (Text User Interface) power menu for Linux, spec
 - 🔒 **Hyprland Integration** - Native support for hyprlock and hyprctl
 - ⚡ **Zero Configuration** - Works out of the box
 - 🎨 **Fully Riceable** - Customize everything: colors, icons, text, keybindings, layout
+- ✨ **Background Animations** - Matrix rain, thunderstorm, snow, stars, fireflies, and more
 
 ## Installation
 
@@ -114,6 +115,31 @@ This creates `~/.config/rexit/config.toml` with all default values commented.
 2. `$XDG_CONFIG_HOME/rexit/config.toml` (usually `~/.config/rexit/config.toml`)
 
 ### Configuration Options
+
+#### Background Animations
+
+`rexit` supports animated backgrounds in the empty space around the menu. The Matrix animation is enabled by default.
+
+```toml
+[animation]
+enabled = true          # Enable/disable background animation
+animation_type = "matrix"  # Options: "matrix", "rain", "thunder", "snow", "stars", "fireflies", "none"
+speed_ms = 80           # Animation speed in milliseconds (lower = faster)
+color = "green"         # Animation color (for single-color animations)
+density = 50            # Particle density (0-100, higher = more particles)
+```
+
+**Available Animation Types:**
+
+| Animation | Description |
+|-----------|-------------|
+| `matrix` | Classic Matrix digital rain effect with Japanese katakana characters |
+| `rain` | Gentle rain falling from top to bottom |
+| `thunder` | Dark stormy background with random lightning flashes |
+| `snow` | Gentle snowfall with drifting flakes |
+| `stars` | Twinkling stars in the night sky |
+| `fireflies` | Glowing fireflies drifting around the screen |
+| `none` | No animation (static background) |
 
 #### Window Title
 
@@ -272,6 +298,166 @@ min_height = 10
 
 ### Example Rices
 
+#### Matrix Theme (Default)
+
+The default Matrix theme with green digital rain:
+
+```toml
+title = " rexit "
+title_alignment = "center"
+
+[colors]
+foreground = "#00ff41"
+background = "black"
+border = "#00ff41"
+selected_fg = "black"
+selected_bg = "#00ff41"
+selected_modifier = ["bold"]
+icon_color = "#00ff41"
+help_fg = "#008f11"
+help_key_fg = "#00ff41"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+enabled = true
+animation_type = "matrix"
+speed_ms = 80
+color = "green"
+density = 50
+```
+
+#### Thunderstorm Theme
+
+Dark and moody with lightning flashes:
+
+```toml
+title = " rexit "
+title_alignment = "center"
+
+[colors]
+foreground = "#d4d4d4"
+background = "#0a0a0f"
+border = "#4a4a5a"
+selected_fg = "#0a0a0f"
+selected_bg = "#6a6a8a"
+selected_modifier = ["bold"]
+icon_color = "#8a8aaa"
+help_fg = "#3a3a4a"
+help_key_fg = "#5a5a7a"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+enabled = true
+animation_type = "thunder"
+speed_ms = 100
+color = "white"
+density = 30
+```
+
+#### Winter Theme
+
+Peaceful snowfall:
+
+```toml
+title = " rexit "
+title_alignment = "center"
+
+[colors]
+foreground = "#e0f7fa"
+background = "#001529"
+border = "#81d4fa"
+selected_fg = "#001529"
+selected_bg = "#81d4fa"
+selected_modifier = ["bold"]
+icon_color = "#b3e5fc"
+help_fg = "#4a6572"
+help_key_fg = "#81d4fa"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+enabled = true
+animation_type = "snow"
+speed_ms = 120
+color = "white"
+density = 40
+```
+
+#### Starry Night Theme
+
+Twinkling stars in a peaceful night:
+
+```toml
+title = " rexit "
+title_alignment = "center"
+
+[colors]
+foreground = "#f5f5f5"
+background = "#0d1b2a"
+border = "#778da9"
+selected_fg = "#0d1b2a"
+selected_bg = "#e0e1dd"
+selected_modifier = ["bold"]
+icon_color = "#e0e1dd"
+help_fg = "#415a77"
+help_key_fg = "#778da9"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+enabled = true
+animation_type = "stars"
+speed_ms = 150
+color = "yellow"
+density = 30
+```
+
+#### Fireflies Theme
+
+Warm summer evening atmosphere:
+
+```toml
+title = " rexit "
+title_alignment = "center"
+
+[colors]
+foreground = "#f4e4c1"
+background = "#1a1a2e"
+border = "#e9c46a"
+selected_fg = "#1a1a2e"
+selected_bg = "#e9c46a"
+selected_modifier = ["bold"]
+icon_color = "#f4a261"
+help_fg = "#6b5b4f"
+help_key_fg = "#e9c46a"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+enabled = true
+animation_type = "fireflies"
+speed_ms = 100
+color = "yellow"
+density = 20
+```
+
 #### Dracula Theme
 
 ```toml
@@ -427,6 +613,23 @@ cargo run
 | Logout     | `hyprctl dispatch exit`        |
 
 ## Dependencies
+
+### Runtime Dependencies
+
+- **systemd** - For system power management
+- **hyprlock** - For screen locking (Hyprland)
+- **hyprctl** - For session management (Hyprland)
+
+### Build Dependencies
+
+- **ratatui** (0.28) - TUI framework
+- **crossterm** (0.28) - Terminal manipulation
+- **anyhow** (1.0) - Error handling
+- **clap** (4.5) - Command-line argument parsing
+- **serde** (1.0) - Serialization
+- **toml** (0.8) - TOML parsing
+- **directories** (5.0) - Config directory detection
+- **rand** (0.8) - Random number generation (for animations)
 
 ### Runtime Dependencies
 

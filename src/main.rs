@@ -11,7 +11,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame, Terminal,
 };
 use serde::{Deserialize, Serialize};
@@ -49,6 +49,9 @@ pub struct Config {
 
     /// Layout configuration
     pub layout: LayoutConfig,
+
+    /// Background animation configuration
+    pub animation: AnimationConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,6 +112,20 @@ pub struct LayoutConfig {
     pub max_width: u16,
     /// Padding inside the menu box (default: 1)
     pub padding: u16,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnimationConfig {
+    /// Enable background animation
+    pub enabled: bool,
+    /// Animation type: "matrix", "rain", "thunder", "snow", "stars", "fireflies", "none"
+    pub animation_type: String,
+    /// Animation speed in milliseconds (lower = faster)
+    pub speed_ms: u64,
+    /// Animation color (for single-color animations)
+    pub color: String,
+    /// Animation density (0-100, higher = more particles)
+    pub density: u8,
 }
 
 impl Default for Config {
@@ -228,6 +245,13 @@ impl Default for Config {
                 min_height: 10,
                 max_width: 60,
                 padding: 1,
+            },
+            animation: AnimationConfig {
+                enabled: true,
+                animation_type: "matrix".to_string(),
+                speed_ms: 80,
+                color: "green".to_string(),
+                density: 50,
             },
         }
     }
@@ -420,6 +444,15 @@ min_height = 10
 max_width = 60
 ## Padding inside the menu box (default: 1)
 padding = 1
+
+[animation]
+## Background animation settings
+## Animation types: "matrix", "rain", "thunder", "snow", "stars", "fireflies", "none"
+enabled = true
+animation_type = "matrix"
+speed_ms = 80
+color = "green"
+density = 50
 "##,
     )
 }
@@ -552,6 +585,64 @@ struct App {
     selected_index: usize,
     should_quit: bool,
     config: Config,
+    animation_state: AnimationState,
+}
+
+/// Animation state for background effects
+struct AnimationState {
+    /// Current animation frame/tick
+    tick: u64,
+    /// Matrix rain columns (x position, y position, speed, char)
+    matrix_columns: Vec<MatrixColumn>,
+    /// Rain drops (x position, y position, speed)
+    rain_drops: Vec<RainDrop>,
+    /// Snow flakes (x position, y position, speed, size)
+    snow_flakes: Vec<SnowFlake>,
+    /// Stars (x position, y position, brightness, twinkle speed)
+    stars: Vec<Star>,
+    /// Fireflies (x position, y position, dx, dy, brightness)
+    fireflies: Vec<Firefly>,
+    /// Thunder flash state
+    thunder_flash: u8,
+    /// Last update time
+    last_update: std::time::Instant,
+}
+
+struct MatrixColumn {
+    x: u16,
+    y: f32,
+    speed: f32,
+    char_idx: usize,
+}
+
+struct RainDrop {
+    x: u16,
+    y: f32,
+    speed: f32,
+    length: u16,
+}
+
+struct SnowFlake {
+    x: f32,
+    y: f32,
+    speed: f32,
+    size: u8,
+}
+
+struct Star {
+    x: u16,
+    y: u16,
+    brightness: u8,
+    twinkle_speed: f32,
+    twinkle_offset: f32,
+}
+
+struct Firefly {
+    x: f32,
+    y: f32,
+    dx: f32,
+    dy: f32,
+    brightness: u8,
 }
 
 impl App {
@@ -568,12 +659,19 @@ impl App {
             })
             .collect();
 
-        Self {
+        let mut app = Self {
             actions,
             selected_index: 0,
             should_quit: false,
             config,
-        }
+            animation_state: AnimationState::new(),
+        };
+
+        // Initialize animation based on terminal size
+        let terminal_size = ratatui::layout::Rect::new(0, 0, 80, 24); // Default, will update on first render
+        app.animation_state.init(&app.config, terminal_size);
+
+        app
     }
 
     fn next(&mut self) {
@@ -611,17 +709,320 @@ impl App {
             false
         }
     }
+
+    fn update_animation(&mut self, area: Rect) {
+        if !self.config.animation.enabled || self.config.animation.animation_type == "none" {
+            return;
+        }
+
+        let now = std::time::Instant::now();
+        let elapsed = now
+            .duration_since(self.animation_state.last_update)
+            .as_millis() as u64;
+
+        if elapsed < self.config.animation.speed_ms {
+            return;
+        }
+
+        self.animation_state.last_update = now;
+        self.animation_state.tick += 1;
+
+        // Reinitialize if terminal size changed significantly
+        if area.width > 0 && area.height > 0 {
+            let needs_init = match self.config.animation.animation_type.as_str() {
+                "matrix" => {
+                    self.animation_state.matrix_columns.is_empty()
+                        && self.config.animation.density > 0
+                }
+                "rain" => {
+                    self.animation_state.rain_drops.is_empty() && self.config.animation.density > 0
+                }
+                "snow" => {
+                    self.animation_state.snow_flakes.is_empty() && self.config.animation.density > 0
+                }
+                "stars" => {
+                    self.animation_state.stars.is_empty() && self.config.animation.density > 0
+                }
+                "fireflies" => {
+                    self.animation_state.fireflies.is_empty() && self.config.animation.density > 0
+                }
+                _ => false,
+            };
+
+            if needs_init {
+                self.animation_state.init(&self.config, area);
+            }
+        }
+
+        // Update based on animation type
+        match self.config.animation.animation_type.as_str() {
+            "matrix" => self.animation_state.update_matrix(area, &self.config),
+            "rain" => self.animation_state.update_rain(area, &self.config),
+            "thunder" => self.animation_state.update_thunder(),
+            "snow" => self.animation_state.update_snow(area, &self.config),
+            "stars" => self.animation_state.update_stars(&self.config),
+            "fireflies" => self.animation_state.update_fireflies(area, &self.config),
+            _ => {}
+        }
+    }
 }
+
+impl AnimationState {
+    fn new() -> Self {
+        Self {
+            tick: 0,
+            matrix_columns: Vec::new(),
+            rain_drops: Vec::new(),
+            snow_flakes: Vec::new(),
+            stars: Vec::new(),
+            fireflies: Vec::new(),
+            thunder_flash: 0,
+            last_update: std::time::Instant::now(),
+        }
+    }
+
+    fn init(&mut self, config: &Config, area: Rect) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        match config.animation.animation_type.as_str() {
+            "matrix" => {
+                let density = config.animation.density as usize;
+                let count = ((area.width as usize * density) / 100).max(1);
+                self.matrix_columns.clear();
+                for _ in 0..count {
+                    self.matrix_columns.push(MatrixColumn {
+                        x: rng.gen_range(0..area.width),
+                        y: rng.gen_range(0.0..area.height as f32),
+                        speed: rng.gen_range(0.2..1.5),
+                        char_idx: rng.gen_range(0..MATRIX_CHARS.len()),
+                    });
+                }
+            }
+            "rain" => {
+                let density = config.animation.density as usize;
+                let count = ((area.width as usize * density) / 10).max(5);
+                self.rain_drops.clear();
+                for _ in 0..count {
+                    self.rain_drops.push(RainDrop {
+                        x: rng.gen_range(0..area.width),
+                        y: rng.gen_range(0.0..area.height as f32),
+                        speed: rng.gen_range(0.5..2.5),
+                        length: rng.gen_range(2..6),
+                    });
+                }
+            }
+            "snow" => {
+                let density = config.animation.density as usize;
+                let count = ((area.width as usize * area.height as usize * density) / 500).max(10);
+                self.snow_flakes.clear();
+                for _ in 0..count {
+                    self.snow_flakes.push(SnowFlake {
+                        x: rng.gen_range(0.0..area.width as f32),
+                        y: rng.gen_range(0.0..area.height as f32),
+                        speed: rng.gen_range(0.1..0.5),
+                        size: rng.gen_range(1..3),
+                    });
+                }
+            }
+            "stars" => {
+                let density = config.animation.density as usize;
+                let count = ((area.width as usize * area.height as usize * density) / 300).max(5);
+                self.stars.clear();
+                for _ in 0..count {
+                    self.stars.push(Star {
+                        x: rng.gen_range(0..area.width),
+                        y: rng.gen_range(0..area.height),
+                        brightness: rng.gen_range(50..255),
+                        twinkle_speed: rng.gen_range(0.05..0.2),
+                        twinkle_offset: rng.gen_range(0.0..6.28),
+                    });
+                }
+            }
+            "fireflies" => {
+                let density = config.animation.density as usize;
+                let count = ((area.width as usize * area.height as usize * density) / 800).max(3);
+                self.fireflies.clear();
+                for _ in 0..count {
+                    self.fireflies.push(Firefly {
+                        x: rng.gen_range(2.0..(area.width.saturating_sub(2)) as f32),
+                        y: rng.gen_range(2.0..(area.height.saturating_sub(2)) as f32),
+                        dx: rng.gen_range(-0.3..0.3),
+                        dy: rng.gen_range(-0.3..0.3),
+                        brightness: rng.gen_range(100..255),
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn update_matrix(&mut self, area: Rect, config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for col in &mut self.matrix_columns {
+            col.y += col.speed;
+            if col.y >= area.height as f32 {
+                col.y = 0.0;
+                col.x = rng.gen_range(0..area.width);
+                col.speed = rng.gen_range(0.2..1.5);
+            }
+            if self.tick % 3 == 0 {
+                col.char_idx = rng.gen_range(0..MATRIX_CHARS.len());
+            }
+        }
+
+        // Randomly respawn columns to maintain density
+        let target_count = ((area.width as usize * config.animation.density as usize) / 100).max(1);
+        while self.matrix_columns.len() < target_count {
+            self.matrix_columns.push(MatrixColumn {
+                x: rng.gen_range(0..area.width),
+                y: 0.0,
+                speed: rng.gen_range(0.2..1.5),
+                char_idx: rng.gen_range(0..MATRIX_CHARS.len()),
+            });
+        }
+    }
+
+    fn update_rain(&mut self, area: Rect, config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for drop in &mut self.rain_drops {
+            drop.y += drop.speed;
+            if drop.y >= area.height as f32 + drop.length as f32 {
+                drop.y = -(drop.length as f32);
+                drop.x = rng.gen_range(0..area.width);
+            }
+        }
+
+        let target_count = ((area.width as usize * config.animation.density as usize) / 10).max(5);
+        while self.rain_drops.len() < target_count {
+            self.rain_drops.push(RainDrop {
+                x: rng.gen_range(0..area.width),
+                y: rng.gen_range(-10.0..0.0),
+                speed: rng.gen_range(0.5..2.5),
+                length: rng.gen_range(2..6),
+            });
+        }
+    }
+
+    fn update_thunder(&mut self) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        // Random thunder flashes
+        if self.thunder_flash > 0 {
+            self.thunder_flash -= 1;
+        } else if rng.gen_bool(0.02) {
+            self.thunder_flash = rng.gen_range(2..5);
+        }
+    }
+
+    fn update_snow(&mut self, area: Rect, config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for flake in &mut self.snow_flakes {
+            flake.y += flake.speed;
+            flake.x += rng.gen_range(-0.3..0.3); // Slight horizontal drift
+
+            if flake.y >= area.height as f32 {
+                flake.y = 0.0;
+                flake.x = rng.gen_range(0.0..area.width as f32);
+            }
+            if flake.x < 0.0 {
+                flake.x = area.width as f32 - 1.0;
+            } else if flake.x >= area.width as f32 {
+                flake.x = 0.0;
+            }
+        }
+
+        let target_count =
+            ((area.width as usize * area.height as usize * config.animation.density as usize)
+                / 500)
+                .max(10);
+        while self.snow_flakes.len() < target_count {
+            self.snow_flakes.push(SnowFlake {
+                x: rng.gen_range(0.0..area.width as f32),
+                y: rng.gen_range(0.0..area.height as f32),
+                speed: rng.gen_range(0.1..0.5),
+                size: rng.gen_range(1..3),
+            });
+        }
+    }
+
+    fn update_stars(&mut self, config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for star in &mut self.stars {
+            let twinkle = (self.tick as f32 * star.twinkle_speed + star.twinkle_offset).sin();
+            star.brightness = ((twinkle + 1.0) * 100.0 + 50.0) as u8;
+        }
+
+        // Occasionally add/remove stars
+        if self.tick % 60 == 0 && rng.gen_bool(0.1) {
+            let target_count = ((200 * config.animation.density as usize) / 100).max(5);
+            if self.stars.len() < target_count && !self.stars.is_empty() {
+                self.stars.push(Star {
+                    x: rng.gen_range(0..200),
+                    y: rng.gen_range(0..60),
+                    brightness: rng.gen_range(50..255),
+                    twinkle_speed: rng.gen_range(0.05..0.2),
+                    twinkle_offset: rng.gen_range(0.0..6.28),
+                });
+            }
+        }
+    }
+
+    fn update_fireflies(&mut self, area: Rect, _config: &Config) {
+        for firefly in &mut self.fireflies {
+            firefly.x += firefly.dx;
+            firefly.y += firefly.dy;
+
+            // Bounce off edges
+            if firefly.x <= 1.0 || firefly.x >= area.width.saturating_sub(2) as f32 {
+                firefly.dx = -firefly.dx;
+                firefly.x = firefly.x.clamp(1.0, area.width.saturating_sub(2) as f32);
+            }
+            if firefly.y <= 1.0 || firefly.y >= area.height.saturating_sub(2) as f32 {
+                firefly.dy = -firefly.dy;
+                firefly.y = firefly.y.clamp(1.0, area.height.saturating_sub(2) as f32);
+            }
+
+            // Pulse brightness
+            let pulse = (self.tick as f32 * 0.1).sin();
+            firefly.brightness = ((pulse + 1.0) * 75.0 + 50.0) as u8;
+        }
+    }
+}
+
+// Matrix characters for the animation
+const MATRIX_CHARS: &[char] = &[
+    'ｱ', 'ｲ', 'ｳ', 'ｴ', 'ｵ', 'ｶ', 'ｷ', 'ｸ', 'ｹ', 'ｺ', 'ｻ', 'ｼ', 'ｽ', 'ｾ', 'ｿ', 'ﾀ', 'ﾁ', 'ﾂ', 'ﾃ',
+    'ﾄ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'H', 'E', 'M', 'A', 'T', 'R', 'I',
+    'X', 'ﾊ', 'ﾋ', 'ﾌ', 'ﾍ', 'ﾎ', 'ﾏ', 'ﾐ', 'ﾑ', 'ﾒ', 'ﾓ',
+];
 
 // ============================================================================
 // UI RENDERING
 // ============================================================================
 
-fn ui(f: &mut Frame, app: &App) {
+fn ui(f: &mut Frame, app: &mut App) {
     let size = f.area();
-    let config = &app.config;
 
-    let center_area = if config.layout.auto_scale {
+    // Update and render background animation first (needs mutable borrow)
+    app.update_animation(size);
+
+    // Clone config values we need to avoid borrow issues
+    let auto_scale = app.config.layout.auto_scale;
+    let render_help = app.config.help_text.enabled;
+
+    render_background_animation(f, app, size);
+
+    let center_area = if auto_scale {
         calculate_auto_layout(f, app, size)
     } else {
         calculate_fixed_layout(f, app, size)
@@ -686,8 +1087,237 @@ fn ui(f: &mut Frame, app: &App) {
     f.render_widget(list, center_area);
 
     // Render help text
-    if config.help_text.enabled {
+    if render_help {
         render_help_text(f, app, size);
+    }
+}
+
+fn render_background_animation(f: &mut Frame, app: &App, size: Rect) {
+    let config = &app.config;
+
+    if !config.animation.enabled || config.animation.animation_type == "none" {
+        return;
+    }
+
+    let animation_color = parse_color(&config.animation.color);
+    let bg_color = parse_color(&config.colors.background);
+
+    match config.animation.animation_type.as_str() {
+        "matrix" => render_matrix(f, &app.animation_state, size, animation_color, bg_color),
+        "rain" => render_rain(f, &app.animation_state, size, animation_color, bg_color),
+        "thunder" => render_thunder(f, &app.animation_state, size, animation_color, bg_color),
+        "snow" => render_snow(f, &app.animation_state, size, animation_color, bg_color),
+        "stars" => render_stars(f, &app.animation_state, size, animation_color, bg_color),
+        "fireflies" => render_fireflies(f, &app.animation_state, size, animation_color, bg_color),
+        _ => {}
+    }
+}
+
+fn render_matrix(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
+    let mut spans = vec![];
+
+    for col in &state.matrix_columns {
+        let y = col.y as u16;
+        if y < size.height {
+            let intensity = ((col.y / size.height as f32) * 255.0) as u8;
+            let char_color = match color {
+                Color::Green => Color::Rgb(0, intensity.max(100), 0),
+                Color::Blue => Color::Rgb(0, 0, intensity.max(100)),
+                Color::Cyan => Color::Rgb(0, intensity.max(100), intensity.max(100)),
+                _ => color,
+            };
+
+            let line_idx = y as usize;
+            while spans.len() <= line_idx {
+                spans.push(vec![]);
+            }
+
+            let char_str = MATRIX_CHARS[col.char_idx].to_string();
+            spans[line_idx].push(Span::styled(char_str, Style::default().fg(char_color)));
+        }
+    }
+
+    // Render spans at appropriate positions
+    for (y, line_spans) in spans.iter().enumerate() {
+        if !line_spans.is_empty() && y < size.height as usize {
+            let text = Line::from(line_spans.clone());
+            let paragraph = Paragraph::new(text).style(Style::default().bg(parse_color("black")));
+            let area = Rect::new(0, y as u16, size.width, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+
+    // Render trailing trails
+    for col in &state.matrix_columns {
+        let head_y = col.y as u16;
+        let trail_length = 5u16;
+
+        for i in 1..=trail_length {
+            let trail_y = head_y.saturating_sub(i);
+            if trail_y < size.height {
+                let trail_intensity = ((trail_length - i) * 40) as u8;
+                let trail_color = match color {
+                    Color::Green => Color::Rgb(0, trail_intensity + 20, 0),
+                    Color::Blue => Color::Rgb(0, 0, trail_intensity + 20),
+                    Color::Cyan => Color::Rgb(0, trail_intensity + 20, trail_intensity + 20),
+                    _ => color,
+                };
+
+                let span = Span::styled("│", Style::default().fg(trail_color));
+
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(col.x, trail_y, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+}
+
+fn render_rain(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
+    for drop in &state.rain_drops {
+        let y = drop.y as u16;
+        if y < size.height {
+            let rain_char = if drop.speed > 1.5 { "│" } else { "┆" };
+            let intensity = (100 + (drop.speed * 50.0) as u8).min(255);
+
+            let rain_color = match color {
+                Color::Blue => Color::Rgb(100, 100, intensity),
+                Color::Cyan => Color::Rgb(100, intensity, intensity),
+                Color::White => Color::Rgb(intensity, intensity, intensity + 50),
+                _ => color,
+            };
+
+            let span = Span::styled(rain_char, Style::default().fg(rain_color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(drop.x, y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_thunder(f: &mut Frame, state: &AnimationState, size: Rect, _color: Color, bg: Color) {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+
+    // Flash effect
+    if state.thunder_flash > 0 {
+        let flash_color = Color::Rgb(240, 240, 255);
+        let clear = Clear;
+        f.render_widget(clear, size);
+
+        // Random lightning bolt
+        if state.thunder_flash > 2 {
+            let start_x = rng.gen_range(5..size.width.saturating_sub(5));
+            let mut current_x = start_x;
+            let mut current_y = 0u16;
+
+            while current_y < size.height {
+                let bolt_char = if rng.gen_bool(0.5) { "│" } else { "╱" };
+                let span = Span::styled(bolt_char, Style::default().fg(flash_color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(current_x, current_y, 1, 1);
+                f.render_widget(paragraph, area);
+
+                current_y += 1;
+                if rng.gen_bool(0.3) {
+                    current_x = current_x.saturating_add(1).min(size.width - 1);
+                } else if rng.gen_bool(0.3) {
+                    current_x = current_x.saturating_sub(1);
+                }
+            }
+        }
+    } else {
+        // Dark, moody background with occasional distant flashes
+        let _dark_bg = match bg {
+            Color::Black => Color::Rgb(10, 10, 15),
+            _ => bg,
+        };
+
+        // Fill background
+        let clear = Clear;
+        f.render_widget(clear, size);
+
+        // Occasional distant lightning glow
+        if rng.gen_bool(0.05) {
+            let glow_x = rng.gen_range(0..size.width);
+            let glow_y = rng.gen_range(0..size.height.saturating_sub(5));
+            let glow_span = Span::styled("░", Style::default().fg(Color::Rgb(30, 30, 40)));
+            let text = Line::from(vec![glow_span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(glow_x, glow_y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_snow(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
+    for flake in &state.snow_flakes {
+        let y = flake.y as u16;
+        let x = flake.x as u16;
+        if y < size.height && x < size.width {
+            let snow_char = match flake.size {
+                1 => "·",
+                2 => "•",
+                _ => "*",
+            };
+
+            let intensity = (150 + flake.size * 30) as u8;
+            let snow_color = match color {
+                Color::White => Color::Rgb(intensity, intensity, intensity),
+                _ => color,
+            };
+
+            let span = Span::styled(snow_char, Style::default().fg(snow_color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(x, y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_stars(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
+    for star in &state.stars {
+        if star.x < size.width && star.y < size.height {
+            let star_char = if star.brightness > 200 { "★" } else { "☆" };
+            let intensity = star.brightness;
+
+            let star_color = match color {
+                Color::Yellow => Color::Rgb(intensity, intensity, intensity / 2),
+                Color::White => Color::Rgb(intensity, intensity, intensity),
+                _ => color,
+            };
+
+            let span = Span::styled(star_char, Style::default().fg(star_color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(star.x, star.y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_fireflies(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
+    for firefly in &state.fireflies {
+        let y = firefly.y as u16;
+        let x = firefly.x as u16;
+        if y < size.height && x < size.width {
+            let intensity = firefly.brightness;
+            let firefly_color = match color {
+                Color::Yellow => Color::Rgb(intensity, intensity, 0),
+                Color::Green => Color::Rgb(0, intensity, 0),
+                _ => Color::Rgb(intensity, intensity, intensity / 2),
+            };
+
+            let span = Span::styled("●", Style::default().fg(firefly_color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(x, y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
     }
 }
 
@@ -828,7 +1458,7 @@ fn render_help_text(f: &mut Frame, app: &App, size: Rect) {
 #[derive(Parser)]
 #[command(name = "rexit")]
 #[command(author = "Ninso112")]
-#[command(version = "0.2.0")]
+#[command(version = "0.3.0")]
 #[command(about = "A rice-ready TUI power menu for Linux, optimized for Hyprland", long_about = None)]
 struct Cli {
     /// Generate default configuration file
