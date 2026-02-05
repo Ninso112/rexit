@@ -1,0 +1,22 @@
+[package]
+name = "rexit"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ninso112"]
+description = "A minimalist TUI power menu for Linux, optimized for Hyprland"
+repository = "https://github.com/Ninso112/rexit"
+license = "MIT"
+keywords = ["tui", "power-menu", "hyprland", "linux", "system"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+ratatui = "0.28"
+crossterm = "0.28"
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

@@ -6,8 +6,6 @@
 
 A minimalist TUI (Text User Interface) power menu for Linux, specifically optimized for Hyprland users.
 
-**Repository**: [https://github.com/Ninso112/rexit](https://github.com/Ninso112/rexit)
-
 ## Description
 
 `rexit` is a lightweight, terminal-based power menu designed for Linux systems, with special optimizations for Hyprland window manager users. It provides a clean, minimal interface to quickly execute common power management commands without leaving your terminal.
@@ -225,5 +223,3 @@ If you encounter any issues or have questions:
 3. Include your system information and error messages
 
 ---
-
-**Repository**: [https://github.com/Ninso112/rexit](https://github.com/Ninso112/rexit)
