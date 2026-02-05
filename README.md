@@ -4,7 +4,7 @@
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-blue.svg)](https://www.rust-lang.org/)
 [![Hyprland](https://img.shields.io/badge/Hyprland-compatible-green.svg)](https://hyprland.org/)
 
-A minimalist TUI (Text User Interface) power menu for Linux, specifically optimized for Hyprland users.
+A **rice-ready** minimalist TUI (Text User Interface) power menu for Linux, specifically optimized for Hyprland users.
 
 ## Description
 
@@ -18,15 +18,7 @@ A minimalist TUI (Text User Interface) power menu for Linux, specifically optimi
 - 🎯 **Focused Functionality** - Six essential power options in one place
 - 🔒 **Hyprland Integration** - Native support for hyprlock and hyprctl
 - ⚡ **Zero Configuration** - Works out of the box
-
-### Available Actions
-
-- **Shutdown** ⏻ - Powers off the system
-- **Reboot** ↻ - Restarts the system
-- **Suspend** ⏾ - Suspends to RAM
-- **Lock** 🔒 - Locks the session (Hyprland)
-- **Logout** ⇥ - Exits the current session (Hyprland)
-- **Cancel** ✕ - Closes the menu without action
+- 🎨 **Fully Riceable** - Customize everything: colors, icons, text, keybindings, layout
 
 ## Installation
 
@@ -67,7 +59,17 @@ Launch `rexit` from your terminal:
 rexit
 ```
 
-### Keyboard Controls
+### Command Line Options
+
+```bash
+# Generate default configuration file
+rexit --init
+
+# Use custom config file
+rexit --config /path/to/config.toml
+```
+
+### Keyboard Controls (Default)
 
 | Key           | Action                      |
 |---------------|-----------------------------|
@@ -91,15 +93,288 @@ Or for any terminal:
 bind = $mainMod SHIFT, E, exec, alacritty -e rexit
 ```
 
-## Commands Executed
+## Ricing / Configuration
 
-| Action     | Command                        |
-|------------|--------------------------------|
-| Shutdown   | `systemctl poweroff`           |
-| Reboot     | `systemctl reboot`             |
-| Suspend    | `systemctl suspend`            |
-| Lock       | `hyprlock`                     |
-| Logout     | `hyprctl dispatch exit`        |
+`rexit` is designed to be fully customizable. Everything can be configured through a TOML configuration file.
+
+### Creating a Config File
+
+Generate the default configuration:
+
+```bash
+rexit --init
+```
+
+This creates `~/.config/rexit/config.toml` with all default values commented.
+
+### Config Location
+
+`rexit` looks for configuration in the following order:
+1. Path specified with `--config`
+2. `$XDG_CONFIG_HOME/rexit/config.toml` (usually `~/.config/rexit/config.toml`)
+
+### Configuration Options
+
+#### Window Title
+
+```toml
+title = " rexit "
+title_alignment = "center"  # Options: "left", "center", "right"
+```
+
+#### Border Style
+
+```toml
+[border]
+enabled = true
+style = "rounded"  # Options: "plain", "rounded", "double", "thick"
+```
+
+#### Colors
+
+All colors support:
+- Named colors: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `gray`, `white`
+- Light variants: `lightred`, `lightgreen`, `lightyellow`, `lightblue`, `lightmagenta`, `lightcyan`
+- Dark variants: `darkgray`
+- Hex colors: `#RRGGBB` (e.g., `#ff0000`, `#1a1a2e`)
+
+```toml
+[colors]
+foreground = "white"
+background = "black"
+border = "cyan"
+selected_fg = "black"
+selected_bg = "white"
+selected_modifier = ["bold"]  # Options: bold, italic, underlined, slowblink, rapidblink, reversed, hidden, crossedout
+icon_color = "white"
+help_fg = "gray"
+help_key_fg = "cyan"
+help_key_modifier = ["bold"]
+```
+
+#### Keybindings
+
+```toml
+[keys]
+# Key names: Use crossterm KeyCode names
+# Examples: "q", "Esc", "Enter", "Up", "Down", "Left", "Right", "Tab", "Backspace"
+# Modifiers can be added with format: "Ctrl-q", "Alt-q", "Shift-Up"
+up = ["Up", "k"]
+down = ["Down", "j"]
+select = ["Enter"]
+quit = ["Esc", "q"]
+```
+
+#### Actions
+
+Each action can be customized with its own icon, label, and command:
+
+```toml
+[actions.shutdown]
+icon = "⏻"
+label = "Shutdown"
+command = "systemctl"
+args = ["poweroff"]
+enabled = true
+```
+
+**Note on Icons**: Icons can be specified as:
+- Direct Unicode characters: `icon = "⏻"`
+- Unicode escape sequences: `icon = "\u{23FB}"` (useful for special characters)
+- Nerd Fonts icons (e.g., `󰐥`) if your terminal uses a Nerd Font
+
+```toml
+[actions.shutdown]
+icon = "⏻"
+label = "Shutdown"
+command = "systemctl"
+args = ["poweroff"]
+enabled = true
+
+[actions.reboot]
+icon = "↻"
+label = "Reboot"
+command = "systemctl"
+args = ["reboot"]
+enabled = true
+
+[actions.suspend]
+icon = "⏾"
+label = "Suspend"
+command = "systemctl"
+args = ["suspend"]
+enabled = true
+
+[actions.lock]
+icon = "🔒"
+label = "Lock"
+command = "hyprlock"
+args = []
+enabled = true
+
+[actions.logout]
+icon = "⇥"
+label = "Logout"
+command = "hyprctl"
+args = ["dispatch", "exit"]
+enabled = true
+
+[actions.cancel]
+icon = "✕"
+label = "Cancel"
+command = ""  # Empty command just exits
+args = []
+enabled = true
+```
+
+#### Help Text
+
+```toml
+[help_text]
+enabled = true
+template = "{keys} {action} | "
+separator = " | "
+```
+
+#### Layout
+
+```toml
+[layout]
+vertical_margin = 30      # Percentage of vertical space around the menu
+horizontal_margin = 30    # Percentage of horizontal space around the menu
+min_width = 30           # Minimum width of the menu
+min_height = 10          # Minimum height of the menu
+```
+
+### Example Rices
+
+#### Dracula Theme
+
+```toml
+title = "  󰐥 Power Menu  "
+title_alignment = "center"
+
+[colors]
+foreground = "#f8f8f2"
+background = "#282a36"
+border = "#bd93f9"
+selected_fg = "#282a36"
+selected_bg = "#50fa7b"
+selected_modifier = ["bold"]
+icon_color = "#f8f8f2"
+help_fg = "#6272a4"
+help_key_fg = "#ff79c6"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+```
+
+#### Nord Theme
+
+```toml
+title = " POWER "
+title_alignment = "left"
+
+[colors]
+foreground = "#d8dee9"
+background = "#2e3440"
+border = "#88c0d0"
+selected_fg = "#2e3440"
+selected_bg = "#88c0d0"
+selected_modifier = ["bold"]
+icon_color = "#d8dee9"
+help_fg = "#4c566a"
+help_key_fg = "#81a1c1"
+help_key_modifier = ["bold"]
+```
+
+#### Gruvbox Dark Theme
+
+```toml
+title = " ⏻ Menu "
+title_alignment = "center"
+
+[colors]
+foreground = "#ebdbb2"
+background = "#282828"
+border = "#d79921"
+selected_fg = "#282828"
+selected_bg = "#d79921"
+selected_modifier = ["bold"]
+icon_color = "#ebdbb2"
+help_fg = "#928374"
+help_key_fg = "#b8bb26"
+help_key_modifier = ["bold"]
+
+[actions.shutdown]
+icon = "󰐥"
+label = "Shutdown"
+command = "systemctl"
+args = ["poweroff"]
+enabled = true
+
+[actions.reboot]
+icon = "󰜉"
+label = "Reboot"
+command = "systemctl"
+args = ["reboot"]
+enabled = true
+
+[actions.suspend]
+icon = "󰒲"
+label = "Suspend"
+command = "systemctl"
+args = ["suspend"]
+enabled = true
+
+[actions.lock]
+icon = "󰌾"
+label = "Lock"
+command = "hyprlock"
+args = []
+enabled = true
+
+[actions.logout]
+icon = "󰍃"
+label = "Logout"
+command = "hyprctl"
+args = ["dispatch", "exit"]
+enabled = true
+
+[actions.cancel]
+icon = "󰜺"
+label = "Cancel"
+command = ""
+args = []
+enabled = true
+```
+
+#### Minimalist (No Border, No Help)
+
+```toml
+title = ""
+title_alignment = "center"
+
+[border]
+enabled = false
+
+[help_text]
+enabled = false
+
+[colors]
+foreground = "#ffffff"
+background = "#000000"
+border = "#000000"
+selected_fg = "#000000"
+selected_bg = "#ffffff"
+selected_modifier = []
+icon_color = "#ffffff"
+help_fg = "#808080"
+help_key_fg = "#ffffff"
+help_key_modifier = []
+```
 
 ## Building
 
@@ -117,28 +392,15 @@ cargo test
 cargo run
 ```
 
-## Configuration
+## Commands Executed
 
-`rexit` works out of the box with sensible defaults. No configuration file is needed. All commands use standard system utilities.
-
-### Customization
-
-If you need to customize the commands, you can fork the repository and modify the `execute()` method in `src/main.rs`:
-
-```rust
-fn execute(&self) -> Result<()> {
-    match self {
-        PowerAction::Lock => {
-            // Change this to your preferred lock command
-            Command::new("your-lock-command")
-                .spawn()
-                .context("Failed to execute lock command")?;
-        }
-        // ... other actions
-    }
-    Ok(())
-}
-```
+| Action     | Command                        |
+|------------|--------------------------------|
+| Shutdown   | `systemctl poweroff`           |
+| Reboot     | `systemctl reboot`             |
+| Suspend    | `systemctl suspend`            |
+| Lock       | `hyprlock`                     |
+| Logout     | `hyprctl dispatch exit`        |
 
 ## Dependencies
 
@@ -154,6 +416,9 @@ fn execute(&self) -> Result<()> {
 - **crossterm** (0.28) - Terminal manipulation
 - **anyhow** (1.0) - Error handling
 - **clap** (4.5) - Command-line argument parsing
+- **serde** (1.0) - Serialization
+- **toml** (0.8) - TOML parsing
+- **directories** (5.0) - Config directory detection
 
 ## Contributing
 
