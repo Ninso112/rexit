@@ -1117,62 +1117,65 @@ fn render_background_animation(f: &mut Frame, app: &App, size: Rect) {
 }
 
 fn render_matrix(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
-    let mut spans = vec![];
+    // Build each line of the matrix
+    for y in 0..size.height {
+        let mut line_chars: Vec<(char, Color)> = vec![];
 
-    for col in &state.matrix_columns {
-        let y = col.y as u16;
-        if y < size.height {
-            let intensity = ((col.y / size.height as f32) * 255.0) as u8;
-            let char_color = match color {
-                Color::Green => Color::Rgb(0, intensity.max(100), 0),
-                Color::Blue => Color::Rgb(0, 0, intensity.max(100)),
-                Color::Cyan => Color::Rgb(0, intensity.max(100), intensity.max(100)),
-                _ => color,
-            };
+        for col in &state.matrix_columns {
+            let head_y = col.y as u16;
+            let trail_length = 8u16;
 
-            let line_idx = y as usize;
-            while spans.len() <= line_idx {
-                spans.push(vec![]);
+            // Check if this column has content at this y position
+            if col.x >= size.width {
+                continue;
             }
 
-            let char_str = MATRIX_CHARS[col.char_idx].to_string();
-            spans[line_idx].push(Span::styled(char_str, Style::default().fg(char_color)));
-        }
-    }
+            // Calculate trail
+            for i in 0..=trail_length {
+                let trail_y = head_y.saturating_sub(i);
+                if trail_y == y {
+                    let fade_factor = if i == 0 {
+                        1.0 // Head is brightest
+                    } else {
+                        (trail_length - i) as f32 / trail_length as f32
+                    };
 
-    // Render spans at appropriate positions
-    for (y, line_spans) in spans.iter().enumerate() {
-        if !line_spans.is_empty() && y < size.height as usize {
-            let text = Line::from(line_spans.clone());
+                    let intensity = (fade_factor * 255.0) as u8;
+
+                    let char_color = match color {
+                        Color::Green => Color::Rgb(0, intensity, 0),
+                        Color::Blue => Color::Rgb(0, 0, intensity),
+                        Color::Cyan => Color::Rgb(0, intensity, intensity),
+                        _ => Color::Rgb(intensity, intensity, intensity),
+                    };
+
+                    let ch = if i == 0 {
+                        MATRIX_CHARS[col.char_idx]
+                    } else {
+                        // Use different char for trail
+                        MATRIX_CHARS[(col.char_idx + i as usize) % MATRIX_CHARS.len()]
+                    };
+
+                    // Store at correct x position
+                    while line_chars.len() <= col.x as usize {
+                        line_chars.push((' ', parse_color("black")));
+                    }
+                    line_chars[col.x as usize] = (ch, char_color);
+                }
+            }
+        }
+
+        // Build spans for this line
+        let spans: Vec<Span> = line_chars
+            .into_iter()
+            .map(|(ch, col)| Span::styled(ch.to_string(), Style::default().fg(col)))
+            .collect();
+
+        if !spans.is_empty() {
+            let text = Line::from(spans);
             let paragraph = Paragraph::new(text).style(Style::default().bg(parse_color("black")));
-            let area = Rect::new(0, y as u16, size.width, 1);
+            let area = Rect::new(0, y, size.width, 1);
             f.render_widget(paragraph, area);
-        }
-    }
-
-    // Render trailing trails
-    for col in &state.matrix_columns {
-        let head_y = col.y as u16;
-        let trail_length = 5u16;
-
-        for i in 1..=trail_length {
-            let trail_y = head_y.saturating_sub(i);
-            if trail_y < size.height {
-                let trail_intensity = ((trail_length - i) * 40) as u8;
-                let trail_color = match color {
-                    Color::Green => Color::Rgb(0, trail_intensity + 20, 0),
-                    Color::Blue => Color::Rgb(0, 0, trail_intensity + 20),
-                    Color::Cyan => Color::Rgb(0, trail_intensity + 20, trail_intensity + 20),
-                    _ => color,
-                };
-
-                let span = Span::styled("│", Style::default().fg(trail_color));
-
-                let text = Line::from(vec![span]);
-                let paragraph = Paragraph::new(text);
-                let area = Rect::new(col.x, trail_y, 1, 1);
-                f.render_widget(paragraph, area);
-            }
         }
     }
 }
