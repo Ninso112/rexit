@@ -97,10 +97,18 @@ pub struct HelpConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutConfig {
+    /// Auto-scale menu to fit content (default: true)
+    /// When enabled, the menu size is calculated based on content
+    /// When disabled, uses percentage-based margins
+    pub auto_scale: bool,
     pub vertical_margin: u16,
     pub horizontal_margin: u16,
     pub min_width: u16,
     pub min_height: u16,
+    /// Maximum width of the menu (0 = unlimited, default: 60)
+    pub max_width: u16,
+    /// Padding inside the menu box (default: 1)
+    pub padding: u16,
 }
 
 impl Default for Config {
@@ -213,10 +221,13 @@ impl Default for Config {
                 separator: " | ".to_string(),
             },
             layout: LayoutConfig {
+                auto_scale: true,
                 vertical_margin: 30,
                 horizontal_margin: 30,
                 min_width: 30,
                 min_height: 10,
+                max_width: 60,
+                padding: 1,
             },
         }
     }
@@ -397,10 +408,18 @@ template = "{keys} {action} | "
 separator = " | "
 
 [layout]
+## Auto-scale menu to fit content (default: true)
+## When true, menu size is calculated based on content length
+## When false, uses percentage-based margins from vertical/horizontal_margin
+auto_scale = true
 vertical_margin = 30
 horizontal_margin = 30
 min_width = 30
 min_height = 10
+## Maximum width when auto_scale is enabled (0 = unlimited, default: 60)
+max_width = 60
+## Padding inside the menu box (default: 1)
+padding = 1
 "##,
     )
 }
@@ -602,30 +621,11 @@ fn ui(f: &mut Frame, app: &App) {
     let size = f.area();
     let config = &app.config;
 
-    // Calculate layout
-    let vertical_constraints = vec![
-        Constraint::Percentage(config.layout.vertical_margin),
-        Constraint::Min(config.layout.min_height),
-        Constraint::Percentage(config.layout.vertical_margin),
-    ];
-
-    let vertical_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(vertical_constraints)
-        .split(size);
-
-    let horizontal_constraints = vec![
-        Constraint::Percentage(config.layout.horizontal_margin),
-        Constraint::Min(config.layout.min_width),
-        Constraint::Percentage(config.layout.horizontal_margin),
-    ];
-
-    let horizontal_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(horizontal_constraints)
-        .split(vertical_chunks[1]);
-
-    let center_area = horizontal_chunks[1];
+    let center_area = if config.layout.auto_scale {
+        calculate_auto_layout(f, app, size)
+    } else {
+        calculate_fixed_layout(f, app, size)
+    };
 
     // Parse colors
     let fg_color = parse_color(&config.colors.foreground);
@@ -689,6 +689,82 @@ fn ui(f: &mut Frame, app: &App) {
     if config.help_text.enabled {
         render_help_text(f, app, size);
     }
+}
+
+fn calculate_auto_layout(_f: &mut Frame, app: &App, size: Rect) -> Rect {
+    let config = &app.config;
+
+    // Calculate content dimensions
+    let max_label_width = app
+        .actions
+        .iter()
+        .map(|action| action.display_text().chars().count())
+        .max()
+        .unwrap_or(0) as u16;
+
+    // Calculate menu dimensions
+    let padding = config.layout.padding;
+    let border_width = if config.border.enabled { 2 } else { 0 };
+    let title_width = config.title.chars().count() as u16;
+
+    // Content width + padding on both sides + borders
+    let content_width = max_label_width.max(title_width.saturating_sub(2));
+    let menu_width = content_width + (padding * 2) + border_width;
+
+    // Apply max_width limit
+    let final_width = if config.layout.max_width > 0 {
+        menu_width.min(config.layout.max_width)
+    } else {
+        menu_width
+    };
+
+    // Ensure minimum width
+    let final_width = final_width.max(config.layout.min_width);
+
+    // Calculate height based on number of actions + borders + padding
+    let action_count = app.actions.len() as u16;
+    let menu_height = action_count + (padding * 2) + border_width;
+    let final_height = menu_height.max(config.layout.min_height);
+
+    // Center the menu
+    let x = (size.width.saturating_sub(final_width)) / 2;
+    let y = (size.height.saturating_sub(final_height)) / 2;
+
+    Rect {
+        x,
+        y,
+        width: final_width,
+        height: final_height,
+    }
+}
+
+fn calculate_fixed_layout(_f: &mut Frame, app: &App, size: Rect) -> Rect {
+    let config = &app.config;
+
+    // Calculate layout using percentage-based margins
+    let vertical_constraints = vec![
+        Constraint::Percentage(config.layout.vertical_margin),
+        Constraint::Min(config.layout.min_height),
+        Constraint::Percentage(config.layout.vertical_margin),
+    ];
+
+    let vertical_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vertical_constraints)
+        .split(size);
+
+    let horizontal_constraints = vec![
+        Constraint::Percentage(config.layout.horizontal_margin),
+        Constraint::Min(config.layout.min_width),
+        Constraint::Percentage(config.layout.horizontal_margin),
+    ];
+
+    let horizontal_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(horizontal_constraints)
+        .split(vertical_chunks[1]);
+
+    horizontal_chunks[1]
 }
 
 fn render_help_text(f: &mut Frame, app: &App, size: Rect) {

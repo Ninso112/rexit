@@ -240,10 +240,34 @@ separator = " | "
 
 ```toml
 [layout]
-vertical_margin = 30      # Percentage of vertical space around the menu
-horizontal_margin = 30    # Percentage of horizontal space around the menu
+auto_scale = true         # Automatically scale menu to fit content
+vertical_margin = 30      # Percentage of vertical space around the menu (when auto_scale = false)
+horizontal_margin = 30    # Percentage of horizontal space around the menu (when auto_scale = false)
 min_width = 30           # Minimum width of the menu
 min_height = 10          # Minimum height of the menu
+max_width = 60           # Maximum width when auto_scale is enabled (0 = unlimited)
+padding = 1              # Padding inside the menu box
+```
+
+#### Layout Modes
+
+**Auto-Scale Mode (Default)** - Menu automatically sizes to fit content:
+```toml
+[layout]
+auto_scale = true
+min_width = 30           # Minimum width
+max_width = 60           # Maximum width (prevents overly wide menu)
+padding = 1              # Inner padding
+```
+
+**Fixed Mode** - Use percentage-based margins:
+```toml
+[layout]
+auto_scale = false
+vertical_margin = 30     # 30% of terminal height as margin
+horizontal_margin = 30   # 30% of terminal width as margin
+min_width = 30
+min_height = 10
 ```
 
 ### Example Rices
