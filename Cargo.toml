@@ -1,9 +1,9 @@
 [package]
 name = "rexit"
-version = "0.3.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Ninso112"]
-description = "A minimalist TUI power menu for Linux, optimized for Hyprland"
+description = "A rice-ready TUI power menu for Linux with multi-WM support"
 repository = "https://github.com/Ninso112/rexit"
 license = "GPL-3.0"
 keywords = ["tui", "power-menu", "hyprland", "linux", "system", "rice"]

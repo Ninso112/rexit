@@ -3,23 +3,28 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-blue.svg)](https://www.rust-lang.org/)
 [![Hyprland](https://img.shields.io/badge/Hyprland-compatible-green.svg)](https://hyprland.org/)
+[![Sway](https://img.shields.io/badge/Sway-compatible-blue.svg)](https://swaywm.org/)
+[![i3](https://img.shields.io/badge/i3-compatible-orange.svg)](https://i3wm.org/)
 
-A **rice-ready** minimalist TUI (Text User Interface) power menu for Linux, specifically optimized for Hyprland users.
+A **rice-ready** TUI (Text User Interface) power menu for Linux, supporting multiple window managers including Hyprland, Sway, i3, BSPWM, and AwesomeWM.
 
 ## Description
 
-`rexit` is a lightweight, terminal-based power menu designed for Linux systems, with special optimizations for Hyprland window manager users. It provides a clean, minimal interface to quickly execute common power management commands without leaving your terminal.
+`rexit` is a lightweight, terminal-based power menu designed for Linux systems, with special optimizations for Hyprland window manager users. It provides a clean interface to quickly execute common power management commands without leaving your terminal.
 
 ### Features
 
 - 🖥️ **Clean TUI Interface** - Built with Ratatui for a beautiful terminal experience
 - ⌨️ **Keyboard Navigation** - Navigate with Arrow keys or Vim keys (j/k)
-- 🚀 **Fast & Lightweight** - Minimal resource usage, instant startup
+- 🔑 **Action Shortcuts** - Each action has its own configurable shortcut (e.g., `s` for Shutdown, `r` for Reboot)
+- 🚀 **Fast & Lightweight** - Low resource usage, instant startup
 - 🎯 **Focused Functionality** - Six essential power options in one place
-- 🔒 **Hyprland Integration** - Native support for hyprlock and hyprctl
+- 🔒 **Multi-WM Support** - Native support for Hyprland, Sway, i3, BSPWM, and AwesomeWM with automatic detection
+- 📐 **Flexible Layouts** - Vertical, horizontal, grid, and compact layout modes
 - ⚡ **Zero Configuration** - Works out of the box
 - 🎨 **Fully Riceable** - Customize everything: colors, icons, text, keybindings, layout
-- ✨ **Background Animations** - Matrix rain, thunderstorm, snow, stars, fireflies, and more
+- ✨ **Background Animations** - Matrix rain, thunderstorm, snow, stars, fireflies, bubbles, confetti, waves, and particles
+- 🥚 **Easter Eggs** - Hidden surprises like the Konami code (try it!)
 
 ## Installation
 
@@ -79,6 +84,21 @@ rexit --config /path/to/config.toml
 | `Enter`       | Execute selected command    |
 | `Esc` / `q`   | Cancel and exit             |
 
+### Action Shortcuts
+
+Each action can have its own shortcut key. The default shortcuts are:
+
+| Action   | Shortcut |
+|----------|----------|
+| Shutdown | `s`      |
+| Reboot   | `r`      |
+| Suspend  | `u`      |
+| Lock     | `l`      |
+| Logout   | `o`      |
+| Cancel   | `c`      |
+
+Shortcuts are configurable in the config file.
+
 ### Hyprland Keybinding
 
 Add this to your Hyprland configuration (`~/.config/hypr/hyprland.conf`):
@@ -97,6 +117,39 @@ bind = $mainMod SHIFT, E, exec, alacritty -e rexit
 ## Ricing / Configuration
 
 `rexit` is designed to be fully customizable. Everything can be configured through a TOML configuration file.
+
+### Layout Modes
+
+`rexit` supports multiple layout modes to fit your preferences:
+
+| Mode       | Description                                           |
+|------------|-------------------------------------------------------|
+| `vertical` | Default vertical list layout                          |
+| `horizontal` | Horizontal layout with icons and labels side-by-side |
+| `grid`     | 2-column grid layout                                  |
+| `compact`  | Clean layout showing only icons                       |
+
+Set the layout mode in your config:
+```toml
+layout_mode = "grid"  # Options: "vertical", "horizontal", "grid", "compact"
+```
+
+### Window Manager Auto-Detection
+
+`rexit` automatically detects your window manager and sets the appropriate logout command. Supported WMs:
+
+| WM        | Detection Method                           | Logout Command                         |
+|-----------|-------------------------------------------|----------------------------------------|
+| Hyprland  | `HYPRLAND_INSTANCE_SIGNATURE` env var     | `hyprctl dispatch exit`                |
+| Sway      | `SWAYSOCK` env var                        | `swaymsg exit`                         |
+| i3        | `XDG_SESSION_DESKTOP`                     | `i3-msg exit`                          |
+| BSPWM     | `XDG_SESSION_DESKTOP`                     | `bspc quit`                            |
+| AwesomeWM | `XDG_SESSION_DESKTOP`                     | `awesome-client "awesome.quit()"`      |
+
+You can also manually set your WM:
+```toml
+wm_type = "sway"  # Options: "auto", "hyprland", "sway", "i3", "bspwm", "awesome"
+```
 
 ### Creating a Config File
 
@@ -123,7 +176,7 @@ This creates `~/.config/rexit/config.toml` with all default values commented.
 ```toml
 [animation]
 enabled = true          # Enable/disable background animation
-animation_type = "matrix"  # Options: "matrix", "rain", "thunder", "snow", "stars", "fireflies", "none"
+animation_type = "matrix"  # Options: see table below
 speed_ms = 80           # Animation speed in milliseconds (lower = faster)
 color = "green"         # Animation color (for single-color animations)
 density = 50            # Particle density (0-100, higher = more particles)
@@ -139,13 +192,44 @@ density = 50            # Particle density (0-100, higher = more particles)
 | `snow` | Gentle snowfall with drifting flakes |
 | `stars` | Twinkling stars in the night sky |
 | `fireflies` | Glowing fireflies drifting around the screen |
+| `bubbles` | Rising bubbles with wobble effect |
+| `confetti` | Falling colorful confetti shapes |
+| `wave` | Sine wave patterns across the screen |
+| `particles` | Floating particles that bounce around |
+| `digital_rain` | Binary/hexadecimal falling characters (Matrix-style) |
+| `heartbeat` | Pulsing heartbeat rhythm effect |
+| `plasma` | Liquid plasma color blobs |
+| `scanlines` | Retro CRT monitor scanlines with occasional glitch |
+| `aurora` | Aurora borealis (northern lights) wave effect |
+| `autumn` | Falling autumn leaves |
+| `dna` | Rotating DNA double helix |
+| `synthwave` | Retro 80s synthwave grid with sun |
+| `smoke` | Rising smoke particles |
+| `gradient_flow` | Flowing rainbow gradients |
+| `constellation` | Connected nodes forming constellation patterns |
+| `fish_tank` | Swimming fish with bubbles |
+| `typing_code` | Rust code being typed in real-time |
+| `vortex` | Spiraling vortex tunnel effect |
+| `circuit` | Electronic circuit board traces |
+| `flow_field` | Perlin noise flow field particles |
+| `morse` | GNU/Linux copypasta in Morse code |
+| `lissajous` | Mathematical Lissajous curves |
+| `game_of_life` | Conway's Game of Life simulation |
 | `none` | No animation (static background) |
 
-#### Window Title
+**Easter Egg 🥚:** Try entering the Konami code (↑↑↓↓←→←→BA) while `rexit` is running to activate rainbow mode for compatible animations!
+
+#### Window Title and Layout
 
 ```toml
 title = " rexit "
 title_alignment = "center"  # Options: "left", "center", "right"
+
+## Layout mode: "vertical", "horizontal", "grid", "compact"
+layout_mode = "vertical"
+
+## Window manager type: "auto", "hyprland", "sway", "i3", "bspwm", "awesome"
+wm_type = "auto"
 ```
 
 #### Border Style
@@ -305,6 +389,7 @@ The default Matrix theme with green digital rain:
 ```toml
 title = " rexit "
 title_alignment = "center"
+layout_mode = "vertical"
 
 [colors]
 foreground = "#00ff41"
@@ -337,6 +422,7 @@ Dark and moody with lightning flashes:
 ```toml
 title = " rexit "
 title_alignment = "center"
+layout_mode = "vertical"
 
 [colors]
 foreground = "#d4d4d4"
@@ -369,6 +455,7 @@ Peaceful snowfall:
 ```toml
 title = " rexit "
 title_alignment = "center"
+layout_mode = "vertical"
 
 [colors]
 foreground = "#e0f7fa"
@@ -401,6 +488,7 @@ Twinkling stars in a peaceful night:
 ```toml
 title = " rexit "
 title_alignment = "center"
+layout_mode = "vertical"
 
 [colors]
 foreground = "#f5f5f5"
@@ -433,6 +521,7 @@ Warm summer evening atmosphere:
 ```toml
 title = " rexit "
 title_alignment = "center"
+layout_mode = "vertical"
 
 [colors]
 foreground = "#f4e4c1"
@@ -463,6 +552,7 @@ density = 20
 ```toml
 title = "  󰐥 Power Menu  "
 title_alignment = "center"
+layout_mode = "vertical"
 
 [colors]
 foreground = "#f8f8f2"
@@ -486,6 +576,7 @@ style = "rounded"
 ```toml
 title = " POWER "
 title_alignment = "left"
+layout_mode = "grid"
 
 [colors]
 foreground = "#d8dee9"
@@ -505,6 +596,7 @@ help_key_modifier = ["bold"]
 ```toml
 title = " ⏻ Menu "
 title_alignment = "center"
+layout_mode = "horizontal"
 
 [colors]
 foreground = "#ebdbb2"
@@ -524,6 +616,7 @@ label = "Shutdown"
 command = "systemctl"
 args = ["poweroff"]
 enabled = true
+shortcut = "s"
 
 [actions.reboot]
 icon = "󰜉"
@@ -531,6 +624,7 @@ label = "Reboot"
 command = "systemctl"
 args = ["reboot"]
 enabled = true
+shortcut = "r"
 
 [actions.suspend]
 icon = "󰒲"
@@ -538,6 +632,7 @@ label = "Suspend"
 command = "systemctl"
 args = ["suspend"]
 enabled = true
+shortcut = "u"
 
 [actions.lock]
 icon = "󰌾"
@@ -545,6 +640,7 @@ label = "Lock"
 command = "hyprlock"
 args = []
 enabled = true
+shortcut = "l"
 
 [actions.logout]
 icon = "󰍃"
@@ -552,6 +648,7 @@ label = "Logout"
 command = "hyprctl"
 args = ["dispatch", "exit"]
 enabled = true
+shortcut = "o"
 
 [actions.cancel]
 icon = "󰜺"
@@ -559,13 +656,15 @@ label = "Cancel"
 command = ""
 args = []
 enabled = true
+shortcut = "c"
 ```
 
-#### Minimalist (No Border, No Help)
+#### Clean (No Border, No Help)
 
 ```toml
 title = ""
 title_alignment = "center"
+layout_mode = "compact"
 
 [border]
 enabled = false
@@ -604,6 +703,8 @@ cargo run
 
 ## Commands Executed
 
+### Default Commands (Hyprland)
+
 | Action     | Command                        |
 |------------|--------------------------------|
 | Shutdown   | `systemctl poweroff`           |
@@ -612,13 +713,25 @@ cargo run
 | Lock       | `hyprlock`                     |
 | Logout     | `hyprctl dispatch exit`        |
 
+### Auto-Detected Commands by Window Manager
+
+| WM         | Lock Command    | Logout Command                    |
+|------------|-----------------|-----------------------------------|
+| Hyprland   | `hyprlock`      | `hyprctl dispatch exit`           |
+| Sway       | `swaylock`      | `swaymsg exit`                    |
+| i3         | `i3lock`        | `i3-msg exit`                     |
+| BSPWM      | -               | `bspc quit`                       |
+| AwesomeWM  | -               | `awesome-client "awesome.quit()"` |
+
+*Note: Lock commands for i3, BSPWM, and AwesomeWM should be configured in your config file as these WMs don't have a default lock utility.*
+
 ## Dependencies
 
 ### Runtime Dependencies
 
 - **systemd** - For system power management
-- **hyprlock** - For screen locking (Hyprland)
-- **hyprctl** - For session management (Hyprland)
+- **hyprlock** / **swaylock** / **i3lock** - For screen locking (depending on your WM)
+- **hyprctl** / **swaymsg** / **i3-msg** / **bspc** / **awesome-client** - For session management (auto-detected)
 
 ### Build Dependencies
 
@@ -630,22 +743,6 @@ cargo run
 - **toml** (0.8) - TOML parsing
 - **directories** (5.0) - Config directory detection
 - **rand** (0.8) - Random number generation (for animations)
-
-### Runtime Dependencies
-
-- **systemd** - For system power management
-- **hyprlock** - For screen locking (Hyprland)
-- **hyprctl** - For session management (Hyprland)
-
-### Build Dependencies
-
-- **ratatui** (0.28) - TUI framework
-- **crossterm** (0.28) - Terminal manipulation
-- **anyhow** (1.0) - Error handling
-- **clap** (4.5) - Command-line argument parsing
-- **serde** (1.0) - Serialization
-- **toml** (0.8) - TOML parsing
-- **directories** (5.0) - Config directory detection
 
 ## Contributing
 
@@ -690,7 +787,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ## Screenshots
 
-The interface features a centered menu with a clean, minimal design:
+The interface features a centered menu with a clean design:
 
 ```
 ┌─────────────────────┐
