@@ -3,7 +3,9 @@ use clap::Parser;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        self, disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+    },
 };
 use directories::ProjectDirs;
 use ratatui::{
@@ -1084,11 +1086,10 @@ impl App {
         }
     }
 
-    fn select_animation(&mut self) {
+    fn select_animation(&mut self, size: Rect) {
         let selected = ANIMATION_TYPES[self.animation_menu_index];
         self.config.animation.animation_type = selected.to_string();
-        self.animation_state
-            .init(&self.config, ratatui::layout::Rect::new(0, 0, 80, 24));
+        self.animation_state.init(&self.config, size);
         self.state = AppState::Selecting;
     }
 
@@ -4513,7 +4514,10 @@ fn handle_animation_menu_input(app: &mut App, key: &crossterm::event::KeyEvent) 
             app.next_animation();
         }
         KeyCode::Enter => {
-            app.select_animation();
+            // Get actual terminal size
+            let (cols, rows) = terminal::size().unwrap_or((80, 24));
+            let size = Rect::new(0, 0, cols, rows);
+            app.select_animation(size);
         }
         KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
             app.close_animation_menu();
