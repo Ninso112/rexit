@@ -708,13 +708,19 @@ struct App {
     animation_menu_index: usize,
 }
 
-const ANIMATION_TYPES: &[&str; 30] = &[
+const ANIMATION_TYPES: &[&str; 36] = &[
     "matrix",
+    "matrix_cjk",
     "rain",
     "thunder",
     "snow",
     "stars",
     "fireflies",
+    "fireworks",
+    "neon_grid",
+    "perlin_flow",
+    "cube_3d",
+    "fractals",
     "bubbles",
     "confetti",
     "wave",
@@ -808,6 +814,16 @@ struct AnimationState {
     thunder_flash: u8,
     /// Heartbeat phase
     heartbeat_phase: f32,
+    /// Fireworks particles
+    fireworks: Vec<Firework>,
+    /// Neon grid offset
+    neon_offset: f32,
+    /// Perlin flow field
+    perlin_offset: f32,
+    /// 3D cube rotation
+    cube_rotation: CubeRotation,
+    /// Fractal zoom/offset
+    fractal_offset: (f32, f32),
     /// Last update time
     last_update: std::time::Instant,
 }
@@ -944,6 +960,32 @@ struct GameOfLifeCell {
     alive: bool,
     next_state: bool,
     age: u8,
+}
+
+struct Firework {
+    x: f32,
+    y: f32,
+    vx: f32,
+    vy: f32,
+    particles: Vec<FireworkParticle>,
+    exploded: bool,
+    life: u8,
+    color: (u8, u8, u8),
+}
+
+struct FireworkParticle {
+    x: f32,
+    y: f32,
+    vx: f32,
+    vy: f32,
+    life: u8,
+    max_life: u8,
+}
+
+struct CubeRotation {
+    angle_x: f32,
+    angle_y: f32,
+    angle_z: f32,
 }
 
 impl App {
@@ -1248,6 +1290,15 @@ impl App {
                 "morse" => self.animation_state.morse_message.is_empty(),
                 "lissajous" => self.animation_state.lissajous.is_empty(),
                 "game_of_life" => self.animation_state.gol_grid.is_empty(),
+                "matrix_cjk" => {
+                    self.animation_state.matrix_columns.is_empty()
+                        && self.config.animation.density > 0
+                }
+                "fireworks" => self.animation_state.fireworks.is_empty(),
+                "neon_grid" => false,
+                "perlin_flow" => false,
+                "cube_3d" => false,
+                "fractals" => false,
                 _ => false,
             };
 
@@ -1289,6 +1340,12 @@ impl App {
             "morse" => self.animation_state.update_morse(),
             "lissajous" => self.animation_state.update_lissajous(),
             "game_of_life" => self.animation_state.update_game_of_life(),
+            "matrix_cjk" => self.animation_state.update_matrix(area, &self.config),
+            "fireworks" => self.animation_state.update_fireworks(area),
+            "neon_grid" => self.animation_state.update_neon_grid(),
+            "perlin_flow" => self.animation_state.update_perlin_flow(),
+            "cube_3d" => self.animation_state.update_cube_3d(),
+            "fractals" => self.animation_state.update_fractals(),
             _ => {}
         }
     }
@@ -1435,6 +1492,15 @@ impl AnimationState {
             gol_height: 0,
             thunder_flash: 0,
             heartbeat_phase: 0.0,
+            fireworks: Vec::new(),
+            neon_offset: 0.0,
+            perlin_offset: 0.0,
+            cube_rotation: CubeRotation {
+                angle_x: 0.0,
+                angle_y: 0.0,
+                angle_z: 0.0,
+            },
+            fractal_offset: (0.0, 0.0),
             last_update: std::time::Instant::now(),
         }
     }
@@ -1765,6 +1831,48 @@ impl AnimationState {
                         });
                     }
                 }
+            }
+            "matrix_cjk" => {
+                let density = config.animation.density as usize;
+                let count = ((area.width as usize * density) / 100).max(1);
+                self.matrix_columns.clear();
+                for _ in 0..count {
+                    self.matrix_columns.push(MatrixColumn {
+                        x: rng.gen_range(0..area.width),
+                        y: rng.gen_range(0.0..area.height as f32),
+                        speed: rng.gen_range(0.2..1.5),
+                        char_idx: rng.gen_range(0..256),
+                    });
+                }
+            }
+            "fireworks" => {
+                self.fireworks.clear();
+                self.fireworks.push(Firework {
+                    x: area.width as f32 / 2.0,
+                    y: area.height as f32,
+                    vx: rng.gen_range(-1.0..1.0),
+                    vy: rng.gen_range(-3.0..-2.0),
+                    particles: Vec::new(),
+                    exploded: false,
+                    life: 100,
+                    color: (255, 100, 50),
+                });
+            }
+            "neon_grid" => {
+                self.neon_offset = 0.0;
+            }
+            "perlin_flow" => {
+                self.perlin_offset = 0.0;
+            }
+            "cube_3d" => {
+                self.cube_rotation = CubeRotation {
+                    angle_x: 0.0,
+                    angle_y: 0.0,
+                    angle_z: 0.0,
+                };
+            }
+            "fractals" => {
+                self.fractal_offset = (0.0, 0.0);
             }
             _ => {}
         }
@@ -2504,6 +2612,96 @@ impl AnimationState {
             });
         }
     }
+
+    fn update_fireworks(&mut self, area: Rect) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for firework in &mut self.fireworks {
+            if !firework.exploded {
+                // Rocket phase
+                firework.x += firework.vx;
+                firework.y += firework.vy;
+                firework.vy += 0.05; // Gravity
+
+                // Explode when velocity slows down
+                if firework.vy >= -0.5 {
+                    firework.exploded = true;
+                    let particle_count = rng.gen_range(15..30);
+                    for _ in 0..particle_count {
+                        let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+                        let speed = rng.gen_range(0.5..2.5);
+                        firework.particles.push(FireworkParticle {
+                            x: firework.x,
+                            y: firework.y,
+                            vx: angle.cos() * speed,
+                            vy: angle.sin() * speed,
+                            life: rng.gen_range(30..60),
+                            max_life: 60,
+                        });
+                    }
+                }
+            } else {
+                // Particle phase
+                for particle in &mut firework.particles {
+                    particle.x += particle.vx;
+                    particle.y += particle.vy;
+                    particle.vy += 0.03; // Gravity on particles
+                    particle.life = particle.life.saturating_sub(1);
+                }
+                firework.particles.retain(|p| p.life > 0);
+            }
+            firework.life = firework.life.saturating_sub(1);
+        }
+
+        // Remove dead fireworks
+        self.fireworks
+            .retain(|f| f.life > 0 && (f.life > 50 || !f.particles.is_empty()));
+
+        // Spawn new firework occasionally
+        if rng.gen_bool(0.02) && self.fireworks.len() < 5 {
+            let colors = [
+                (255, 100, 50),  // Orange
+                (255, 50, 50),   // Red
+                (50, 255, 100),  // Green
+                (50, 100, 255),  // Blue
+                (255, 50, 255),  // Purple
+                (255, 255, 50),  // Yellow
+                (50, 255, 255),  // Cyan
+                (255, 255, 255), // White
+            ];
+            self.fireworks.push(Firework {
+                x: rng.gen_range(5.0..(area.width.saturating_sub(5)) as f32),
+                y: area.height as f32,
+                vx: rng.gen_range(-0.5..0.5),
+                vy: rng.gen_range(-3.5..-2.5),
+                particles: Vec::new(),
+                exploded: false,
+                life: 120,
+                color: colors[rng.gen_range(0..colors.len())],
+            });
+        }
+    }
+
+    fn update_neon_grid(&mut self) {
+        self.neon_offset += 0.08;
+    }
+
+    fn update_perlin_flow(&mut self) {
+        self.perlin_offset += 0.015;
+    }
+
+    fn update_cube_3d(&mut self) {
+        self.cube_rotation.angle_x += 0.03;
+        self.cube_rotation.angle_y += 0.05;
+        self.cube_rotation.angle_z += 0.02;
+    }
+
+    fn update_fractals(&mut self) {
+        // Slowly pan the fractal view
+        self.fractal_offset.0 += 0.002;
+        self.fractal_offset.1 += 0.001;
+    }
 }
 
 // Matrix characters for the animation
@@ -3152,6 +3350,19 @@ fn render_background_animation(f: &mut Frame, app: &App, size: Rect) {
         "morse" => render_morse(f, &app.animation_state, size, animation_color),
         "lissajous" => render_lissajous(f, &app.animation_state, size),
         "game_of_life" => render_game_of_life(f, &app.animation_state, size),
+        "matrix_cjk" => render_matrix_cjk(
+            f,
+            &app.animation_state,
+            size,
+            animation_color,
+            bg_color,
+            app.easter_egg.rainbow_mode,
+        ),
+        "fireworks" => render_fireworks(f, &app.animation_state, size, bg_color),
+        "neon_grid" => render_neon_grid(f, &app.animation_state, size, animation_color),
+        "perlin_flow" => render_perlin_flow(f, &app.animation_state, size, animation_color),
+        "cube_3d" => render_cube_3d(f, &app.animation_state, size, animation_color),
+        "fractals" => render_fractals(f, &app.animation_state, size, animation_color),
         _ => {}
     }
 }
@@ -4328,6 +4539,414 @@ fn render_game_of_life(f: &mut Frame, state: &AnimationState, size: Rect) {
             let paragraph = Paragraph::new(text);
             let area = Rect::new(cell.x as u16, cell.y as u16, 1, 1);
             f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_matrix_cjk(
+    f: &mut Frame,
+    state: &AnimationState,
+    size: Rect,
+    color: Color,
+    _bg: Color,
+    rainbow: bool,
+) {
+    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(bg_fill, size);
+
+    // CJK characters for authentic Matrix feel
+    const CJK_CHARS: &[char] = &[
+        'ﾊ', 'ﾐ', 'ﾋ', 'ｰ', 'ｳ', 'ｼ', 'ﾅ', 'ﾓ', 'ﾆ', 'ｻ', 'ﾜ', 'ﾂ', 'ｵ', 'ﾘ', 'ｱ', 'ﾎ', 'ﾃ', 'ﾏ',
+        'ｹ', 'ﾒ', 'ｴ', 'ｶ', 'ｷ', 'ﾑ', 'ﾕ', 'ﾗ', 'ｾ', 'ﾈ', 'ｽ', 'ﾀ', 'ﾇ', 'ﾍ', 'ｦ', 'ｲ', 'ｸ', 'ｺ',
+        'ｿ', 'ﾁ', 'ﾄ', 'ﾉ', 'ﾌ', 'ﾔ', 'ﾖ', 'ﾙ', 'ﾚ', 'ﾛ', 'ﾝ', '零', '一', '二', '三', '四', '五',
+        '六', '七', '八', '九', '十', '百', '千', '万', '円', '日', '本', '語', '中', '国', '人',
+        '大', '小', '上', '下', '左', '右', '東', '西', '南', '北',
+    ];
+
+    for y in 0..size.height {
+        let mut line_spans: Vec<Span> = vec![];
+
+        for col in &state.matrix_columns {
+            let head_y = col.y as u16;
+            let trail_length = 10u16;
+
+            if col.x >= size.width {
+                continue;
+            }
+
+            for i in 0..=trail_length {
+                let trail_y = head_y.saturating_sub(i);
+                if trail_y == y {
+                    let fade_factor = if i == 0 {
+                        1.0
+                    } else {
+                        (trail_length - i) as f32 / trail_length as f32
+                    };
+
+                    let intensity = (fade_factor * 255.0) as u8;
+
+                    // Use different characters in trail
+                    let char_idx = (col.char_idx + i as usize) % CJK_CHARS.len();
+                    let c = CJK_CHARS[char_idx];
+
+                    let char_color = if rainbow {
+                        let hue =
+                            ((col.x as f32 + state.tick as f32 + i as f32 * 10.0) % 360.0) / 360.0;
+                        let r = ((hue * 6.0).sin() * 0.5 + 0.5) * intensity as f32;
+                        let g = ((hue * 6.0 + 2.0).sin() * 0.5 + 0.5) * intensity as f32;
+                        let b = ((hue * 6.0 + 4.0).sin() * 0.5 + 0.5) * intensity as f32;
+                        Color::Rgb(r as u8, g as u8, b as u8)
+                    } else {
+                        match i {
+                            0 => Color::Rgb(255, 255, 255),             // White head
+                            1 => Color::Rgb(intensity, 255, intensity), // Bright green
+                            _ => match color {
+                                Color::Rgb(r, g, b) => {
+                                    let nr = ((r as f32 * intensity as f32) / 255.0) as u8;
+                                    let ng = ((g as f32 * intensity as f32) / 255.0) as u8;
+                                    let nb = ((b as f32 * intensity as f32) / 255.0) as u8;
+                                    Color::Rgb(nr, ng, nb)
+                                }
+                                _ => color,
+                            },
+                        }
+                    };
+
+                    let span = Span::styled(c.to_string(), Style::default().fg(char_color));
+                    // Store position as part of the span using spaces for alignment
+                    let pos = col.x as usize;
+                    while line_spans.len() <= pos {
+                        line_spans.push(Span::styled(" ", Style::default()));
+                    }
+                    line_spans[pos] = span;
+                }
+            }
+        }
+
+        if !line_spans.is_empty() {
+            let line = Line::from(line_spans);
+            let text = Paragraph::new(line);
+            let area = Rect::new(0, y, size.width, 1);
+            f.render_widget(text, area);
+        }
+    }
+}
+
+fn render_fireworks(f: &mut Frame, state: &AnimationState, size: Rect, _bg: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(bg_fill, size);
+
+    for firework in &state.fireworks {
+        if !firework.exploded {
+            // Draw rocket
+            if firework.x >= 0.0
+                && firework.x < size.width as f32
+                && firework.y >= 0.0
+                && firework.y < size.height as f32
+            {
+                let x = firework.x as u16;
+                let y = firework.y as u16;
+                if x < size.width && y < size.height {
+                    let color = Color::Rgb(firework.color.0, firework.color.1, firework.color.2);
+                    let span = Span::styled("▲", Style::default().fg(color));
+                    let line = Line::from(vec![span]);
+                    let text = Paragraph::new(line);
+                    let area = Rect::new(x, y, 1, 1);
+                    f.render_widget(text, area);
+                }
+            }
+        } else {
+            // Draw particles
+            for particle in &firework.particles {
+                if particle.x >= 0.0
+                    && particle.x < size.width as f32
+                    && particle.y >= 0.0
+                    && particle.y < size.height as f32
+                {
+                    let x = particle.x as u16;
+                    let y = particle.y as u16;
+                    if x < size.width && y < size.height {
+                        let fade = particle.life as f32 / particle.max_life as f32;
+                        let r = (firework.color.0 as f32 * fade) as u8;
+                        let g = (firework.color.1 as f32 * fade) as u8;
+                        let b = (firework.color.2 as f32 * fade) as u8;
+                        let color = Color::Rgb(r, g, b);
+
+                        let chars = ['•', '∙', '·'];
+                        let char_idx = ((1.0 - fade) * 2.0) as usize % chars.len();
+                        let span =
+                            Span::styled(chars[char_idx].to_string(), Style::default().fg(color));
+                        let line = Line::from(vec![span]);
+                        let text = Paragraph::new(line);
+                        let area = Rect::new(x, y, 1, 1);
+                        f.render_widget(text, area);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn render_neon_grid(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(bg_fill, size);
+
+    let offset = state.neon_offset;
+
+    // Draw perspective grid lines
+    let _center_x = size.width as f32 / 2.0;
+    let _center_y = size.height as f32 / 2.0 + 5.0;
+
+    for i in 0..20 {
+        let t = i as f32 * 0.05;
+        let y_offset = (offset + t * size.height as f32) % size.height as f32;
+        let y = size
+            .height
+            .saturating_sub(y_offset as u16)
+            .saturating_sub(1);
+
+        if y < size.height {
+            let intensity = ((1.0 - t) * 255.0) as u8;
+            let line_color = match color {
+                Color::Rgb(r, g, b) => {
+                    let nr = ((r as f32) * (intensity as f32 / 255.0)) as u8;
+                    let ng = ((g as f32) * (intensity as f32 / 255.0)) as u8;
+                    let nb = ((b as f32) * (intensity as f32 / 255.0)) as u8;
+                    Color::Rgb(nr, ng, nb)
+                }
+                _ => color,
+            };
+
+            let span = Span::styled(
+                "─".repeat(size.width as usize),
+                Style::default().fg(line_color),
+            );
+            let line = Line::from(vec![span]);
+            let text = Paragraph::new(line);
+            let area = Rect::new(0, y, size.width, 1);
+            f.render_widget(text, area);
+        }
+    }
+
+    // Draw vertical perspective lines
+    for i in 0..size.width {
+        if i % 4 == 0 {
+            let x = i;
+            let span = Span::styled("│", Style::default().fg(color));
+            let line = Line::from(vec![span]);
+            let text = Paragraph::new(line);
+            for y in 0..size.height {
+                let area = Rect::new(x, y, 1, 1);
+                f.render_widget(text.clone(), area);
+            }
+        }
+    }
+}
+
+// Simplex noise function for Perlin flow
+fn noise(x: f32, y: f32) -> f32 {
+    let s = x.sin() + y.cos();
+    (s + 2.0) / 4.0 // Normalize to 0-1
+}
+
+fn render_perlin_flow(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(bg_fill, size);
+
+    let offset = state.perlin_offset;
+    let scale = 0.05;
+
+    for y in 0..size.height {
+        for x in 0..size.width {
+            let nx = x as f32 * scale + offset;
+            let ny = y as f32 * scale + offset * 0.5;
+
+            let n = noise(nx, ny);
+            let n2 = noise(nx * 2.0, ny * 2.0);
+            let combined = (n + n2 * 0.5) / 1.5;
+
+            if combined > 0.6 {
+                let intensity = ((combined - 0.6) / 0.4 * 255.0) as u8;
+                let pixel_color = match color {
+                    Color::Rgb(r, g, b) => {
+                        let nr = ((r as f32) * intensity as f32 / 255.0) as u8;
+                        let ng = ((g as f32) * intensity as f32 / 255.0) as u8;
+                        let nb = ((b as f32) * intensity as f32 / 255.0) as u8;
+                        Color::Rgb(nr, ng, nb)
+                    }
+                    _ => color,
+                };
+
+                let chars = ['·', '∙', '•', '◦'];
+                let char_idx = (combined * chars.len() as f32) as usize % chars.len();
+                let span = Span::styled(
+                    chars[char_idx].to_string(),
+                    Style::default().fg(pixel_color),
+                );
+                let line = Line::from(vec![span]);
+                let text = Paragraph::new(line);
+                let area = Rect::new(x, y, 1, 1);
+                f.render_widget(text, area);
+            }
+        }
+    }
+}
+
+fn render_cube_3d(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(bg_fill, size);
+
+    let center_x = size.width as f32 / 2.0;
+    let center_y = size.height as f32 / 2.0;
+    let scale = (size.width.min(size.height) as f32 / 4.0).min(8.0);
+
+    // Cube vertices
+    let vertices: [(f32, f32, f32); 8] = [
+        (-1.0, -1.0, -1.0),
+        (1.0, -1.0, -1.0),
+        (1.0, 1.0, -1.0),
+        (-1.0, 1.0, -1.0),
+        (-1.0, -1.0, 1.0),
+        (1.0, -1.0, 1.0),
+        (1.0, 1.0, 1.0),
+        (-1.0, 1.0, 1.0),
+    ];
+
+    // Edges connecting vertices
+    let edges: [(usize, usize); 12] = [
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 0), // Back face
+        (4, 5),
+        (5, 6),
+        (6, 7),
+        (7, 4), // Front face
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7), // Connecting edges
+    ];
+
+    let angle_x = state.cube_rotation.angle_x;
+    let angle_y = state.cube_rotation.angle_y;
+
+    // Rotation matrices
+    let cos_x = angle_x.cos();
+    let sin_x = angle_x.sin();
+    let cos_y = angle_y.cos();
+    let sin_y = angle_y.sin();
+
+    // Transform vertices
+    let mut transformed: Vec<(f32, f32)> = Vec::new();
+    for (x, y, z) in &vertices {
+        // Rotate around X
+        let y1 = y * cos_x - z * sin_x;
+        let z1 = y * sin_x + z * cos_x;
+
+        // Rotate around Y
+        let x2 = x * cos_y + z1 * sin_y;
+        let z2 = -x * sin_y + z1 * cos_y;
+
+        // Project to 2D
+        let distance = 4.0;
+        let factor = distance / (distance + z2);
+        let px = center_x + x2 * scale * factor;
+        let py = center_y + y1 * scale * factor * 0.5; // 0.5 for aspect ratio correction
+
+        transformed.push((px, py));
+    }
+
+    // Draw edges
+    for (i, j) in &edges {
+        let (x1, y1) = transformed[*i];
+        let (x2, y2) = transformed[*j];
+
+        // Simple line drawing
+        let dx = (x2 - x1).abs();
+        let dy = (y2 - y1).abs();
+        let steps = (dx.max(dy) as usize).max(1);
+
+        for step in 0..=steps {
+            let t = step as f32 / steps as f32;
+            let px = (x1 + (x2 - x1) * t) as u16;
+            let py = (y1 + (y2 - y1) * t) as u16;
+
+            if px < size.width && py < size.height {
+                let span = Span::styled("█", Style::default().fg(color));
+                let line = Line::from(vec![span]);
+                let text = Paragraph::new(line);
+                let area = Rect::new(px, py, 1, 1);
+                f.render_widget(text, area);
+            }
+        }
+    }
+
+    // Draw vertices
+    for (px, py) in &transformed {
+        let x = *px as u16;
+        let y = *py as u16;
+        if x < size.width && y < size.height {
+            let span = Span::styled("◆", Style::default().fg(Color::White));
+            let line = Line::from(vec![span]);
+            let text = Paragraph::new(line);
+            let area = Rect::new(x, y, 1, 1);
+            f.render_widget(text, area);
+        }
+    }
+}
+
+fn render_fractals(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(bg_fill, size);
+
+    // Render a simple Mandelbrot-like pattern
+    let offset_x = state.fractal_offset.0;
+    let offset_y = state.fractal_offset.1;
+    let zoom = 2.0;
+
+    let max_iter = 20;
+
+    for py in 0..size.height {
+        for px in 0..size.width {
+            // Map pixel to complex plane
+            let x0 = (px as f32 / size.width as f32 - 0.5) * zoom * 2.0 + offset_x;
+            let y0 = (py as f32 / size.height as f32 - 0.5) * zoom + offset_y;
+
+            let mut x = 0.0;
+            let mut y = 0.0;
+            let mut iter = 0;
+
+            while x * x + y * y <= 4.0 && iter < max_iter {
+                let xtemp = x * x - y * y + x0;
+                y = 2.0 * x * y + y0;
+                x = xtemp;
+                iter += 1;
+            }
+
+            if iter < max_iter {
+                let intensity = (iter as f32 / max_iter as f32 * 255.0) as u8;
+                let pixel_color = match color {
+                    Color::Rgb(r, g, b) => {
+                        let nr = ((r as f32) * intensity as f32 / 255.0) as u8;
+                        let ng = ((g as f32) * intensity as f32 / 255.0) as u8;
+                        let nb = ((b as f32) * intensity as f32 / 255.0) as u8;
+                        Color::Rgb(nr, ng, nb)
+                    }
+                    _ => color,
+                };
+
+                let chars = [' ', '·', ':', '-', '=', '+', '*', '#', '%', '@'];
+                let char_idx =
+                    ((iter as f32 / max_iter as f32) * (chars.len() - 1) as f32) as usize;
+                let c = chars[char_idx.min(chars.len() - 1)];
+
+                let span = Span::styled(c.to_string(), Style::default().fg(pixel_color));
+                let line = Line::from(vec![span]);
+                let text = Paragraph::new(line);
+                let area = Rect::new(px, py, 1, 1);
+                f.render_widget(text, area);
+            }
         }
     }
 }

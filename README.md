@@ -28,6 +28,14 @@ A **rice-ready** TUI (Text User Interface) power menu for Linux, supporting mult
 
 ## Installation
 
+### Quick Install
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/Ninso112/rexit/main/install.sh | sh
+```
+
+This will download and install `rexit` using Cargo.
+
 ### Prerequisites
 
 - Rust 1.70 or higher

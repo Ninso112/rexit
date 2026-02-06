@@ -1,6 +1,6 @@
 [package]
 name = "rexit"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 authors = ["Ninso112"]
 description = "A rice-ready TUI power menu for Linux with multi-WM support"
