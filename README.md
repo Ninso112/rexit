@@ -99,6 +99,14 @@ Each action can have its own shortcut key. The default shortcuts are:
 
 Shortcuts are configurable in the config file.
 
+### Hidden Features
+
+| Key | Action |
+|-----|--------|
+| `a` | Open animation selector menu |
+
+The animation menu allows you to switch between all available background animations in real-time without restarting the application.
+
 ### Hyprland Keybinding
 
 Add this to your Hyprland configuration (`~/.config/hypr/hyprland.conf`):

@@ -683,6 +683,7 @@ impl Action {
 enum AppState {
     Selecting,
     Confirming { action_index: usize },
+    AnimationMenu,
 }
 
 /// Tracks easter egg state for Konami code
@@ -702,7 +703,41 @@ struct App {
     state: AppState,
     last_executed: Option<String>, // label of last executed action
     easter_egg: EasterEggState,
+    animation_menu_index: usize,
 }
+
+const ANIMATION_TYPES: &[&str] = &[
+    "matrix",
+    "rain",
+    "thunder",
+    "snow",
+    "stars",
+    "fireflies",
+    "bubbles",
+    "confetti",
+    "wave",
+    "particles",
+    "digital_rain",
+    "heartbeat",
+    "plasma",
+    "scanlines",
+    "aurora",
+    "autumn",
+    "dna",
+    "synthwave",
+    "smoke",
+    "gradient_flow",
+    "constellation",
+    "fish_tank",
+    "typing_code",
+    "vortex",
+    "circuit",
+    "flow_field",
+    "morse",
+    "lissajous",
+    "game_of_life",
+    "none",
+];
 
 /// Animation state for background effects
 struct AnimationState {
@@ -1014,6 +1049,7 @@ impl App {
             state: AppState::Selecting,
             last_executed,
             easter_egg: EasterEggState::new(),
+            animation_menu_index: 0,
         };
 
         // Initialize animation based on terminal size
@@ -1021,6 +1057,39 @@ impl App {
         app.animation_state.init(&app.config, terminal_size);
 
         app
+    }
+
+    fn open_animation_menu(&mut self) {
+        // Find current animation index
+        self.animation_menu_index = ANIMATION_TYPES
+            .iter()
+            .position(|&a| a == self.config.animation.animation_type)
+            .unwrap_or(0);
+        self.state = AppState::AnimationMenu;
+    }
+
+    fn close_animation_menu(&mut self) {
+        self.state = AppState::Selecting;
+    }
+
+    fn next_animation(&mut self) {
+        self.animation_menu_index = (self.animation_menu_index + 1) % ANIMATION_TYPES.len();
+    }
+
+    fn previous_animation(&mut self) {
+        if self.animation_menu_index > 0 {
+            self.animation_menu_index -= 1;
+        } else {
+            self.animation_menu_index = ANIMATION_TYPES.len() - 1;
+        }
+    }
+
+    fn select_animation(&mut self) {
+        let selected = ANIMATION_TYPES[self.animation_menu_index];
+        self.config.animation.animation_type = selected.to_string();
+        self.animation_state
+            .init(&self.config, ratatui::layout::Rect::new(0, 0, 80, 24));
+        self.state = AppState::Selecting;
     }
 
     fn next(&mut self) {
@@ -2470,6 +2539,9 @@ fn ui(f: &mut Frame, app: &mut App) {
         AppState::Confirming { action_index } => {
             render_confirmation_dialog(f, app, *action_index, size);
         }
+        AppState::AnimationMenu => {
+            render_animation_menu(f, app, size);
+        }
         AppState::Selecting => {
             // Render based on layout mode
             match layout_mode.as_str() {
@@ -2911,6 +2983,104 @@ fn render_confirmation_dialog(f: &mut Frame, app: &App, action_index: usize, siz
     let help_area = Rect {
         x: inner.x,
         y: inner.y + 5,
+        width: inner.width,
+        height: 1,
+    };
+    f.render_widget(help_paragraph, help_area);
+}
+
+fn render_animation_menu(f: &mut Frame, app: &App, size: Rect) {
+    let config = &app.config;
+
+    // Parse colors
+    let fg_color = parse_color(&config.colors.foreground);
+    let selected_fg = parse_color(&config.colors.selected_fg);
+    let selected_bg = parse_color(&config.colors.selected_bg);
+    let selected_modifier = parse_modifier(&config.colors.selected_modifier);
+    let border_color = parse_color(&config.colors.border);
+
+    // Calculate menu size
+    let max_item_len = ANIMATION_TYPES.iter().map(|s| s.len()).max().unwrap_or(10);
+    let width = (max_item_len as u16 + 10).max(25).min(size.width - 4);
+    let height = (ANIMATION_TYPES.len() as u16 + 4).min(size.height - 4);
+
+    let x = (size.width.saturating_sub(width)) / 2;
+    let y = (size.height.saturating_sub(height)) / 2;
+
+    let menu_area = Rect {
+        x,
+        y,
+        width,
+        height,
+    };
+
+    // Clear background under menu
+    let clear = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(clear, menu_area);
+
+    // Create border
+    let border_type = match config.border.style.as_str() {
+        "rounded" => Borders::ALL,
+        _ => Borders::ALL,
+    };
+
+    let block = Block::default()
+        .borders(border_type)
+        .title(" Select Animation ")
+        .title_alignment(Alignment::Center)
+        .border_style(Style::default().fg(border_color));
+
+    let inner = block.inner(menu_area);
+    f.render_widget(block, menu_area);
+
+    // Render animation list
+    let visible_items = (inner.height.saturating_sub(2)) as usize;
+    let start_idx = if app.animation_menu_index >= visible_items {
+        app.animation_menu_index.saturating_sub(visible_items - 1)
+    } else {
+        0
+    };
+
+    for (i, &animation) in ANIMATION_TYPES
+        .iter()
+        .enumerate()
+        .skip(start_idx)
+        .take(visible_items)
+    {
+        let is_selected = i == app.animation_menu_index;
+        let is_current = animation == config.animation.animation_type;
+
+        let prefix = if is_current { "● " } else { "  " };
+        let text = format!("{}{}", prefix, animation.replace('_', " "));
+
+        let style = if is_selected {
+            Style::default()
+                .fg(selected_fg)
+                .bg(selected_bg)
+                .add_modifier(selected_modifier)
+        } else {
+            Style::default().fg(fg_color)
+        };
+
+        let item_area = Rect {
+            x: inner.x + 1,
+            y: inner.y + 1 + (i - start_idx) as u16,
+            width: inner.width.saturating_sub(2),
+            height: 1,
+        };
+
+        let paragraph = Paragraph::new(text).style(style);
+        f.render_widget(paragraph, item_area);
+    }
+
+    // Render help text at bottom
+    let help_text = "↑↓ navigate | Enter select | Esc/q cancel";
+    let help_paragraph = Paragraph::new(help_text)
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(parse_color("gray")));
+    let help_area = Rect {
+        x: inner.x,
+        y: inner.y + inner.height - 1,
         width: inner.width,
         height: 1,
     };
@@ -4318,6 +4488,9 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
                         AppState::Confirming { .. } => {
                             handle_confirmation_input(app, &key)?;
                         }
+                        AppState::AnimationMenu => {
+                            handle_animation_menu_input(app, &key)?;
+                        }
                         AppState::Selecting => {
                             handle_selecting_input(app, &key)?;
                         }
@@ -4326,6 +4499,28 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
             }
         }
     }
+    Ok(())
+}
+
+fn handle_animation_menu_input(app: &mut App, key: &crossterm::event::KeyEvent) -> Result<()> {
+    use crossterm::event::KeyCode;
+
+    match key.code {
+        KeyCode::Up => {
+            app.previous_animation();
+        }
+        KeyCode::Down => {
+            app.next_animation();
+        }
+        KeyCode::Enter => {
+            app.select_animation();
+        }
+        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
+            app.close_animation_menu();
+        }
+        _ => {}
+    }
+
     Ok(())
 }
 
@@ -4355,6 +4550,12 @@ fn handle_selecting_input(app: &mut App, key: &crossterm::event::KeyEvent) -> Re
     // Check for Konami code sequence first
     if app.easter_egg.check_konami(key.code) {
         // Konami code activated! Rainbow mode toggled
+        return Ok(());
+    }
+
+    // Check for animation menu hotkey (hidden feature - 'a' key)
+    if let KeyCode::Char('a') = key.code {
+        app.open_animation_menu();
         return Ok(());
     }
 
