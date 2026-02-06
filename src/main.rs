@@ -11,7 +11,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
+    widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame, Terminal,
 };
 use serde::{Deserialize, Serialize};
@@ -89,6 +89,12 @@ pub struct ActionConfig {
     pub command: String,
     pub args: Vec<String>,
     pub enabled: bool,
+    /// Whether this action requires confirmation before executing
+    pub confirm: bool,
+    /// Whether this action is a favorite (shown at top)
+    pub favorite: bool,
+    /// Optional keyboard shortcut (0-9) for quick access
+    pub shortcut: Option<char>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,6 +146,9 @@ impl Default for Config {
                 command: "systemctl".to_string(),
                 args: vec!["poweroff".to_string()],
                 enabled: true,
+                confirm: true,
+                favorite: true,
+                shortcut: Some('1'),
             },
         );
 
@@ -151,6 +160,9 @@ impl Default for Config {
                 command: "systemctl".to_string(),
                 args: vec!["reboot".to_string()],
                 enabled: true,
+                confirm: true,
+                favorite: true,
+                shortcut: Some('2'),
             },
         );
 
@@ -162,6 +174,9 @@ impl Default for Config {
                 command: "systemctl".to_string(),
                 args: vec!["suspend".to_string()],
                 enabled: true,
+                confirm: false,
+                favorite: false,
+                shortcut: Some('3'),
             },
         );
 
@@ -173,6 +188,9 @@ impl Default for Config {
                 command: "hyprlock".to_string(),
                 args: vec![],
                 enabled: true,
+                confirm: false,
+                favorite: false,
+                shortcut: Some('4'),
             },
         );
 
@@ -184,6 +202,9 @@ impl Default for Config {
                 command: "hyprctl".to_string(),
                 args: vec!["dispatch".to_string(), "exit".to_string()],
                 enabled: true,
+                confirm: true,
+                favorite: false,
+                shortcut: Some('5'),
             },
         );
 
@@ -195,6 +216,9 @@ impl Default for Config {
                 command: "".to_string(),
                 args: vec![],
                 enabled: true,
+                confirm: false,
+                favorite: false,
+                shortcut: Some('0'),
             },
         );
 
@@ -321,6 +345,33 @@ fn get_config_path() -> Option<PathBuf> {
     ProjectDirs::from("", "", "rexit").map(|dirs| dirs.config_dir().join("config.toml"))
 }
 
+fn get_last_executed_path() -> Option<PathBuf> {
+    ProjectDirs::from("", "", "rexit").map(|dirs| dirs.config_dir().join("last_executed"))
+}
+
+fn load_last_executed() -> Option<String> {
+    if let Some(path) = get_last_executed_path() {
+        if path.exists() {
+            if let Ok(content) = fs::read_to_string(&path) {
+                let trimmed = content.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn save_last_executed(label: &str) {
+    if let Some(path) = get_last_executed_path() {
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::write(&path, label);
+    }
+}
+
 fn load_config() -> Config {
     if let Some(config_path) = get_config_path() {
         if config_path.exists() {
@@ -390,6 +441,9 @@ label = "Shutdown"
 command = "systemctl"
 args = ["poweroff"]
 enabled = true
+confirm = true      ## Require confirmation before executing
+favorite = true     ## Show at top of list
+shortcut = "1"      ## Press 1 to select
 
 [actions.reboot]
 icon = "\u{21BB}"
@@ -397,6 +451,9 @@ label = "Reboot"
 command = "systemctl"
 args = ["reboot"]
 enabled = true
+confirm = true
+favorite = true
+shortcut = "2"
 
 [actions.suspend]
 icon = "\u{23FE}"
@@ -404,6 +461,9 @@ label = "Suspend"
 command = "systemctl"
 args = ["suspend"]
 enabled = true
+confirm = false
+favorite = false
+shortcut = "3"
 
 [actions.lock]
 icon = "\u{1F512}"
@@ -411,6 +471,9 @@ label = "Lock"
 command = "hyprlock"
 args = []
 enabled = true
+confirm = false
+favorite = false
+shortcut = "4"
 
 [actions.logout]
 icon = "\u{21E5}"
@@ -418,6 +481,9 @@ label = "Logout"
 command = "hyprctl"
 args = ["dispatch", "exit"]
 enabled = true
+confirm = true
+favorite = false
+shortcut = "5"
 
 [actions.cancel]
 icon = "\u{2715}"
@@ -425,6 +491,9 @@ label = "Cancel"
 command = ""
 args = []
 enabled = true
+confirm = false
+favorite = false
+shortcut = "0"
 
 [help_text]
 enabled = true
@@ -554,11 +623,27 @@ struct Action {
     label: String,
     command: String,
     args: Vec<String>,
+    confirm: bool,
+    favorite: bool,
+    shortcut: Option<char>,
 }
 
 impl Action {
-    fn display_text(&self) -> String {
-        format!("{} {}", self.icon, self.label)
+    fn display_text(&self, show_shortcut: bool) -> String {
+        if show_shortcut && self.shortcut.is_some() {
+            format!("{} [{}] {}", self.icon, self.shortcut.unwrap(), self.label)
+        } else {
+            format!("{} {}", self.icon, self.label)
+        }
+    }
+
+    fn is_critical(&self) -> bool {
+        // Auto-detect critical actions if confirm is not explicitly set
+        let lower = self.label.to_lowercase();
+        lower.contains("shutdown")
+            || lower.contains("reboot")
+            || lower.contains("poweroff")
+            || lower.contains("halt")
     }
 
     fn execute(&self) -> Result<()> {
@@ -569,7 +654,7 @@ impl Action {
         let mut cmd = Command::new(&self.command);
         cmd.args(&self.args);
 
-        cmd.spawn()
+        cmd.status()
             .with_context(|| format!("Failed to execute command: {}", self.command))?;
 
         Ok(())
@@ -580,12 +665,19 @@ impl Action {
 // APPLICATION STATE
 // ============================================================================
 
+enum AppState {
+    Selecting,
+    Confirming { action_index: usize },
+}
+
 struct App {
     actions: Vec<Action>,
     selected_index: usize,
     should_quit: bool,
     config: Config,
     animation_state: AnimationState,
+    state: AppState,
+    last_executed: Option<String>, // label of last executed action
 }
 
 /// Animation state for background effects
@@ -647,7 +739,7 @@ struct Firefly {
 
 impl App {
     fn new(config: Config) -> Self {
-        let actions: Vec<Action> = config
+        let mut actions: Vec<Action> = config
             .actions
             .iter()
             .filter(|(_, action_config)| action_config.enabled)
@@ -656,19 +748,38 @@ impl App {
                 label: action_config.label.clone(),
                 command: action_config.command.clone(),
                 args: action_config.args.clone(),
+                confirm: action_config.confirm,
+                favorite: action_config.favorite,
+                shortcut: action_config.shortcut,
             })
             .collect();
 
+        // Sort: favorites first, then by label
+        actions.sort_by(|a, b| match (b.favorite, a.favorite) {
+            (true, false) => std::cmp::Ordering::Greater,
+            (false, true) => std::cmp::Ordering::Less,
+            _ => a.label.cmp(&b.label),
+        });
+
+        // Load last executed action and find its index
+        let last_executed = load_last_executed();
+        let selected_index = last_executed
+            .as_ref()
+            .and_then(|label| actions.iter().position(|a| &a.label == label))
+            .unwrap_or(0);
+
         let mut app = Self {
             actions,
-            selected_index: 0,
+            selected_index,
             should_quit: false,
             config,
             animation_state: AnimationState::new(),
+            state: AppState::Selecting,
+            last_executed,
         };
 
         // Initialize animation based on terminal size
-        let terminal_size = ratatui::layout::Rect::new(0, 0, 80, 24); // Default, will update on first render
+        let terminal_size = ratatui::layout::Rect::new(0, 0, 80, 24);
         app.animation_state.init(&app.config, terminal_size);
 
         app
@@ -692,10 +803,48 @@ impl App {
 
     fn select(&mut self) -> Result<()> {
         if let Some(action) = self.actions.get(self.selected_index) {
+            // Check if confirmation is needed (explicitly set OR auto-detected critical action)
+            let needs_confirm = action.confirm || action.is_critical();
+
+            if needs_confirm && !matches!(self.state, AppState::Confirming { .. }) {
+                // Enter confirmation mode
+                self.state = AppState::Confirming {
+                    action_index: self.selected_index,
+                };
+                return Ok(());
+            }
+
             action.execute()?;
+            self.last_executed = Some(action.label.clone());
+            save_last_executed(&action.label);
         }
         self.should_quit = true;
         Ok(())
+    }
+
+    fn select_at_index(&mut self, index: usize) -> Result<()> {
+        if index < self.actions.len() {
+            self.selected_index = index;
+            self.select()
+        } else {
+            Ok(())
+        }
+    }
+
+    fn confirm_yes(&mut self) -> Result<()> {
+        if let AppState::Confirming { action_index } = self.state {
+            if let Some(action) = self.actions.get(action_index) {
+                action.execute()?;
+                self.last_executed = Some(action.label.clone());
+                save_last_executed(&action.label);
+            }
+            self.should_quit = true;
+        }
+        Ok(())
+    }
+
+    fn confirm_no(&mut self) {
+        self.state = AppState::Selecting;
     }
 
     fn quit(&mut self) {
@@ -835,7 +984,7 @@ impl AnimationState {
                         y: rng.gen_range(0..area.height),
                         brightness: rng.gen_range(50..255),
                         twinkle_speed: rng.gen_range(0.05..0.2),
-                        twinkle_offset: rng.gen_range(0.0..6.28),
+                        twinkle_offset: rng.gen_range(0.0..std::f32::consts::TAU),
                     });
                 }
             }
@@ -868,7 +1017,7 @@ impl AnimationState {
                 col.x = rng.gen_range(0..area.width);
                 col.speed = rng.gen_range(0.2..1.5);
             }
-            if self.tick % 3 == 0 {
+            if self.tick.is_multiple_of(3) {
                 col.char_idx = rng.gen_range(0..MATRIX_CHARS.len());
             }
         }
@@ -963,7 +1112,7 @@ impl AnimationState {
         }
 
         // Occasionally add/remove stars
-        if self.tick % 60 == 0 && rng.gen_bool(0.1) {
+        if self.tick.is_multiple_of(60) && rng.gen_bool(0.1) {
             let target_count = ((200 * config.animation.density as usize) / 100).max(5);
             if self.stars.len() < target_count && !self.stars.is_empty() {
                 self.stars.push(Star {
@@ -971,7 +1120,7 @@ impl AnimationState {
                     y: rng.gen_range(0..60),
                     brightness: rng.gen_range(50..255),
                     twinkle_speed: rng.gen_range(0.05..0.2),
-                    twinkle_offset: rng.gen_range(0.0..6.28),
+                    twinkle_offset: rng.gen_range(0.0..std::f32::consts::TAU),
                 });
             }
         }
@@ -1025,11 +1174,87 @@ fn ui(f: &mut Frame, app: &mut App) {
 
     render_background_animation(f, app, size);
 
-    let center_area = if auto_scale {
-        calculate_auto_layout(f, app, size)
-    } else {
-        calculate_fixed_layout(f, app, size)
-    };
+    // Check if we're in confirmation mode
+    match &app.state {
+        AppState::Confirming { action_index } => {
+            render_confirmation_dialog(f, app, *action_index, size);
+        }
+        AppState::Selecting => {
+            let center_area = if auto_scale {
+                calculate_auto_layout(f, app, size)
+            } else {
+                calculate_fixed_layout(f, app, size)
+            };
+
+            // Parse colors
+            let fg_color = parse_color(&config.colors.foreground);
+            let selected_fg = parse_color(&config.colors.selected_fg);
+            let selected_bg = parse_color(&config.colors.selected_bg);
+            let selected_modifier = parse_modifier(&config.colors.selected_modifier);
+            let border_color = parse_color(&config.colors.border);
+
+            // Create list items with shortcut display
+            let items: Vec<ListItem> = app
+                .actions
+                .iter()
+                .enumerate()
+                .map(|(i, action)| {
+                    let content = action.display_text(true);
+                    let style = if i == app.selected_index {
+                        Style::default()
+                            .fg(selected_fg)
+                            .bg(selected_bg)
+                            .add_modifier(selected_modifier)
+                    } else {
+                        Style::default().fg(fg_color)
+                    };
+                    ListItem::new(Line::from(Span::styled(content, style)))
+                })
+                .collect();
+
+            // Create border style
+            let border_type = match config.border.style.as_str() {
+                "plain" => Borders::ALL,
+                "rounded" => Borders::ALL,
+                "double" => Borders::ALL,
+                "thick" => Borders::ALL,
+                _ => Borders::ALL,
+            };
+
+            let title_alignment = match config.title_alignment.as_str() {
+                "left" => Alignment::Left,
+                "center" => Alignment::Center,
+                "right" => Alignment::Right,
+                _ => Alignment::Center,
+            };
+
+            let list = List::new(items)
+                .block(
+                    Block::default()
+                        .borders(if config.border.enabled {
+                            border_type
+                        } else {
+                            Borders::NONE
+                        })
+                        .title(config.title.clone())
+                        .title_alignment(title_alignment)
+                        .border_style(Style::default().fg(border_color)),
+                )
+                .style(Style::default().fg(fg_color));
+
+            f.render_widget(list, center_area);
+
+            // Render help text
+            if render_help {
+                render_help_text(f, app, size);
+            }
+        }
+    }
+}
+
+fn render_confirmation_dialog(f: &mut Frame, app: &App, action_index: usize, size: Rect) {
+    let config = &app.config;
+    let action = app.actions.get(action_index).unwrap();
 
     // Parse colors
     let fg_color = parse_color(&config.colors.foreground);
@@ -1038,61 +1263,86 @@ fn ui(f: &mut Frame, app: &mut App) {
     let selected_modifier = parse_modifier(&config.colors.selected_modifier);
     let border_color = parse_color(&config.colors.border);
 
-    // Create list items
-    let items: Vec<ListItem> = app
-        .actions
-        .iter()
-        .enumerate()
-        .map(|(i, action)| {
-            let content = action.display_text();
-            let style = if i == app.selected_index {
-                Style::default()
-                    .fg(selected_fg)
-                    .bg(selected_bg)
-                    .add_modifier(selected_modifier)
-            } else {
-                Style::default().fg(fg_color)
-            };
-            ListItem::new(Line::from(Span::styled(content, style)))
-        })
-        .collect();
+    // Calculate dialog size
+    let message = format!("Confirm {}?", action.label);
+    let width = (message.len() as u16 + 10).max(30).min(size.width - 4);
+    let height = 7u16;
 
-    // Create border style
+    let x = (size.width.saturating_sub(width)) / 2;
+    let y = (size.height.saturating_sub(height)) / 2;
+
+    let dialog_area = Rect {
+        x,
+        y,
+        width,
+        height,
+    };
+
+    // Clear background under dialog
+    let clear = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(clear, dialog_area);
+
+    // Create dialog border
     let border_type = match config.border.style.as_str() {
-        "plain" => Borders::ALL,
         "rounded" => Borders::ALL,
-        "double" => Borders::ALL,
-        "thick" => Borders::ALL,
         _ => Borders::ALL,
     };
 
-    let title_alignment = match config.title_alignment.as_str() {
-        "left" => Alignment::Left,
-        "center" => Alignment::Center,
-        "right" => Alignment::Right,
-        _ => Alignment::Center,
-    };
+    let block = Block::default()
+        .borders(border_type)
+        .title(" Confirm ")
+        .title_alignment(Alignment::Center)
+        .border_style(Style::default().fg(border_color));
 
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(if config.border.enabled {
-                    border_type
-                } else {
-                    Borders::NONE
-                })
-                .title(config.title.clone())
-                .title_alignment(title_alignment)
-                .border_style(Style::default().fg(border_color)),
-        )
+    let inner = block.inner(dialog_area);
+    f.render_widget(block, dialog_area);
+
+    // Render message
+    let message_paragraph = Paragraph::new(message)
+        .alignment(Alignment::Center)
         .style(Style::default().fg(fg_color));
+    let message_area = Rect {
+        x: inner.x,
+        y: inner.y + 1,
+        width: inner.width,
+        height: 1,
+    };
+    f.render_widget(message_paragraph, message_area);
 
-    f.render_widget(list, center_area);
+    // Render Yes/No options - No is default (highlighted)
+    let yes_style = Style::default().fg(fg_color);
+    let no_style = Style::default()
+        .fg(selected_fg)
+        .bg(selected_bg)
+        .add_modifier(selected_modifier);
+
+    let options_text = Line::from(vec![
+        Span::styled("[Y] Yes", yes_style),
+        Span::raw("   "),
+        Span::styled("[N] No", no_style),
+    ]);
+
+    let options_paragraph = Paragraph::new(options_text).alignment(Alignment::Center);
+    let options_area = Rect {
+        x: inner.x,
+        y: inner.y + 3,
+        width: inner.width,
+        height: 1,
+    };
+    f.render_widget(options_paragraph, options_area);
 
     // Render help text
-    if render_help {
-        render_help_text(f, app, size);
-    }
+    let help_text = "Y to confirm, N/Enter to cancel, Esc to cancel";
+    let help_paragraph = Paragraph::new(help_text)
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(parse_color("gray")));
+    let help_area = Rect {
+        x: inner.x,
+        y: inner.y + 5,
+        width: inner.width,
+        height: 1,
+    };
+    f.render_widget(help_paragraph, help_area);
 }
 
 fn render_background_animation(f: &mut Frame, app: &App, size: Rect) {
@@ -1117,6 +1367,10 @@ fn render_background_animation(f: &mut Frame, app: &App, size: Rect) {
 }
 
 fn render_matrix(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
+    // Fill background with black first to avoid gray stripes
+    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(bg_fill, size);
+
     // Build each line of the matrix
     for y in 0..size.height {
         let mut line_chars: Vec<(char, Color)> = vec![];
@@ -1181,11 +1435,15 @@ fn render_matrix(f: &mut Frame, state: &AnimationState, size: Rect, color: Color
 }
 
 fn render_rain(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
+    // Fill background with black first to avoid gray stripes
+    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(bg_fill, size);
+
     for drop in &state.rain_drops {
         let y = drop.y as u16;
         if y < size.height {
             let rain_char = if drop.speed > 1.5 { "│" } else { "┆" };
-            let intensity = (100 + (drop.speed * 50.0) as u8).min(255);
+            let intensity = 100 + (drop.speed * 50.0) as u8;
 
             let rain_color = match color {
                 Color::Blue => Color::Rgb(100, 100, intensity),
@@ -1210,8 +1468,9 @@ fn render_thunder(f: &mut Frame, state: &AnimationState, size: Rect, _color: Col
     // Flash effect
     if state.thunder_flash > 0 {
         let flash_color = Color::Rgb(240, 240, 255);
-        let clear = Clear;
-        f.render_widget(clear, size);
+        // Fill with very dark blue/black background during flash
+        let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 5, 10)));
+        f.render_widget(bg_fill, size);
 
         // Random lightning bolt
         if state.thunder_flash > 2 {
@@ -1242,9 +1501,9 @@ fn render_thunder(f: &mut Frame, state: &AnimationState, size: Rect, _color: Col
             _ => bg,
         };
 
-        // Fill background
-        let clear = Clear;
-        f.render_widget(clear, size);
+        // Fill background with very dark color
+        let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 5, 10)));
+        f.render_widget(bg_fill, size);
 
         // Occasional distant lightning glow
         if rng.gen_bool(0.05) {
@@ -1260,6 +1519,10 @@ fn render_thunder(f: &mut Frame, state: &AnimationState, size: Rect, _color: Col
 }
 
 fn render_snow(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
+    // Fill background with black first to avoid gray stripes
+    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(bg_fill, size);
+
     for flake in &state.snow_flakes {
         let y = flake.y as u16;
         let x = flake.x as u16;
@@ -1270,7 +1533,7 @@ fn render_snow(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, 
                 _ => "*",
             };
 
-            let intensity = (150 + flake.size * 30) as u8;
+            let intensity = 150 + flake.size * 30;
             let snow_color = match color {
                 Color::White => Color::Rgb(intensity, intensity, intensity),
                 _ => color,
@@ -1286,6 +1549,10 @@ fn render_snow(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, 
 }
 
 fn render_stars(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
+    // Fill background with black first to avoid gray stripes
+    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(bg_fill, size);
+
     for star in &state.stars {
         if star.x < size.width && star.y < size.height {
             let star_char = if star.brightness > 200 { "★" } else { "☆" };
@@ -1307,6 +1574,10 @@ fn render_stars(f: &mut Frame, state: &AnimationState, size: Rect, color: Color,
 }
 
 fn render_fireflies(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
+    // Fill background with black first to avoid gray stripes
+    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(bg_fill, size);
+
     for firefly in &state.fireflies {
         let y = firefly.y as u16;
         let x = firefly.x as u16;
@@ -1334,7 +1605,7 @@ fn calculate_auto_layout(_f: &mut Frame, app: &App, size: Rect) -> Rect {
     let max_label_width = app
         .actions
         .iter()
-        .map(|action| action.display_text().chars().count())
+        .map(|action| action.display_text(true).chars().count())
         .max()
         .unwrap_or(0) as u16;
 
@@ -1567,51 +1838,87 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
         if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    // Check quit keys
-                    let mut action_taken = false;
-
-                    for key_str in &app.config.keys.quit {
-                        if app.check_key(key_str, &key) {
-                            app.quit();
-                            action_taken = true;
-                            break;
+                    // Handle different states
+                    match &app.state {
+                        AppState::Confirming { .. } => {
+                            handle_confirmation_input(app, &key)?;
                         }
-                    }
-
-                    if !action_taken {
-                        // Check up keys
-                        for key_str in &app.config.keys.up {
-                            if app.check_key(key_str, &key) {
-                                app.previous();
-                                action_taken = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if !action_taken {
-                        // Check down keys
-                        for key_str in &app.config.keys.down {
-                            if app.check_key(key_str, &key) {
-                                app.next();
-                                action_taken = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if !action_taken {
-                        // Check select keys
-                        for key_str in &app.config.keys.select {
-                            if app.check_key(key_str, &key) {
-                                app.select()?;
-                                break;
-                            }
+                        AppState::Selecting => {
+                            handle_selecting_input(app, &key)?;
                         }
                     }
                 }
             }
         }
     }
+    Ok(())
+}
+
+fn handle_confirmation_input(app: &mut App, key: &crossterm::event::KeyEvent) -> Result<()> {
+    use crossterm::event::KeyCode;
+
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            app.confirm_yes()?;
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') => {
+            app.confirm_no();
+        }
+        KeyCode::Enter => {
+            // Enter defaults to No (cancel)
+            app.confirm_no();
+        }
+        KeyCode::Esc => {
+            app.confirm_no();
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_selecting_input(app: &mut App, key: &crossterm::event::KeyEvent) -> Result<()> {
+    // Check quit keys
+    for key_str in &app.config.keys.quit {
+        if app.check_key(key_str, key) {
+            app.quit();
+            return Ok(());
+        }
+    }
+
+    // Check up keys
+    for key_str in &app.config.keys.up {
+        if app.check_key(key_str, key) {
+            app.previous();
+            return Ok(());
+        }
+    }
+
+    // Check down keys
+    for key_str in &app.config.keys.down {
+        if app.check_key(key_str, key) {
+            app.next();
+            return Ok(());
+        }
+    }
+
+    // Check select keys
+    for key_str in &app.config.keys.select {
+        if app.check_key(key_str, key) {
+            app.select()?;
+            return Ok(());
+        }
+    }
+
+    // Check number keys for quick selection (0-9)
+    match key.code {
+        KeyCode::Char(c) if c.is_ascii_digit() => {
+            let digit = c.to_digit(10).unwrap() as usize;
+            // 0 = 10th item, 1-9 = items 0-8
+            let index = if digit == 0 { 9 } else { digit - 1 };
+            app.select_at_index(index)?;
+        }
+        _ => {}
+    }
+
     Ok(())
 }
