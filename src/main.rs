@@ -135,7 +135,7 @@ pub struct LayoutConfig {
 pub struct AnimationConfig {
     /// Enable background animation
     pub enabled: bool,
-    /// Animation type: "matrix", "rain", "thunder", "snow", "stars", "fireflies", "bubbles", "confetti", "wave", "particles", "digital_rain", "heartbeat", "plasma", "scanlines", "aurora", "autumn", "dna", "synthwave", "smoke", "gradient_flow", "constellation", "fish_tank", "typing_code", "vortex", "circuit", "flow_field", "morse", "lissajous", "game_of_life", "none"
+    /// Animation type: "matrix", "matrix_cjk", "rain", "thunder", "snow", "stars", "fireflies", "fireworks", "neon_grid", "perlin_flow", "cube_3d", "fractals", "bubbles", "confetti", "wave", "particles", "digital_rain", "heartbeat", "plasma", "scanlines", "aurora", "autumn", "dna", "synthwave", "smoke", "gradient_flow", "constellation", "fish_tank", "typing_code", "vortex", "circuit", "flow_field", "morse", "lissajous", "game_of_life", "ocean", "ripple", "fog", "flames", "sparks", "lava_lamp", "sun", "galaxy", "meteor_shower", "satellite", "pulsar", "pong", "snake", "tetris", "invaders", "fibonacci", "mandelbrot", "hex_grid", "rose", "butterflies", "spider_web", "vine_growth", "moss", "radar", "binary_clock", "signal", "wifi", "paint_splatter", "ink_bleed", "mosaic", "stained_glass", "hologram", "glitch", "old_film", "thermal", "none"
     pub animation_type: String,
     /// Animation speed in milliseconds (lower = faster)
     pub speed_ms: u64,
@@ -555,7 +555,7 @@ padding = 1
 
 [animation]
 ## Background animation settings
-## Animation types: "matrix", "rain", "thunder", "snow", "stars", "fireflies", "bubbles", "confetti", "wave", "particles", "digital_rain", "heartbeat", "plasma", "scanlines", "aurora", "autumn", "dna", "synthwave", "smoke", "gradient_flow", "constellation", "fish_tank", "typing_code", "vortex", "circuit", "flow_field", "morse", "lissajous", "game_of_life", "none"
+## Animation types: "matrix", "matrix_cjk", "rain", "thunder", "snow", "stars", "fireflies", "fireworks", "neon_grid", "perlin_flow", "cube_3d", "fractals", "bubbles", "confetti", "wave", "particles", "digital_rain", "heartbeat", "plasma", "scanlines", "aurora", "autumn", "dna", "synthwave", "smoke", "gradient_flow", "constellation", "fish_tank", "typing_code", "vortex", "circuit", "flow_field", "morse", "lissajous", "game_of_life", "ocean", "ripple", "fog", "flames", "sparks", "lava_lamp", "sun", "galaxy", "meteor_shower", "satellite", "pulsar", "pong", "snake", "tetris", "invaders", "fibonacci", "mandelbrot", "hex_grid", "rose", "butterflies", "spider_web", "vine_growth", "moss", "radar", "binary_clock", "signal", "wifi", "paint_splatter", "ink_bleed", "mosaic", "stained_glass", "hologram", "glitch", "old_film", "thermal", "none"
 enabled = true
 animation_type = "matrix"
 speed_ms = 80
@@ -746,7 +746,7 @@ struct App {
     grace_period_cancelled: bool, // Track if grace period was cancelled
 }
 
-const ANIMATION_TYPES: &[&str; 36] = &[
+const ANIMATION_TYPES: &[&str; 71] = &[
     "matrix",
     "matrix_cjk",
     "rain",
@@ -782,6 +782,42 @@ const ANIMATION_TYPES: &[&str; 36] = &[
     "morse",
     "lissajous",
     "game_of_life",
+    // New animations v1.1.5
+    "ocean",
+    "ripple",
+    "fog",
+    "flames",
+    "sparks",
+    "lava_lamp",
+    "sun",
+    "galaxy",
+    "meteor_shower",
+    "satellite",
+    "pulsar",
+    "pong",
+    "snake",
+    "tetris",
+    "invaders",
+    "fibonacci",
+    "mandelbrot",
+    "hex_grid",
+    "rose",
+    "butterflies",
+    "spider_web",
+    "vine_growth",
+    "moss",
+    "radar",
+    "binary_clock",
+    "signal",
+    "wifi",
+    "paint_splatter",
+    "ink_bleed",
+    "mosaic",
+    "stained_glass",
+    "hologram",
+    "glitch",
+    "old_film",
+    "thermal",
     "none",
 ];
 
@@ -862,6 +898,76 @@ struct AnimationState {
     cube_rotation: CubeRotation,
     /// Fractal zoom/offset
     fractal_offset: (f32, f32),
+    /// Ocean wave phase
+    ocean_phase: f32,
+    /// Ripple center and radius
+    ripple_radius: f32,
+    /// Fog density
+    fog_density: f32,
+    /// Flame particles
+    flames: Vec<FlameParticle>,
+    /// Spark particles
+    sparks: Vec<Spark>,
+    /// Lava lamp blobs
+    lava_blobs: Vec<LavaBlob>,
+    /// Sun pulse phase
+    sun_phase: f32,
+    /// Galaxy rotation
+    galaxy_angle: f32,
+    /// Meteor shower particles
+    meteors: Vec<Meteor>,
+    /// Satellite position
+    satellite: Satellite,
+    /// Pulsar rotation
+    pulsar_angle: f32,
+    /// Pong game state
+    pong: PongGame,
+    /// Snake game state
+    snake: SnakeGame,
+    /// Tetris game state
+    tetris: TetrisGame,
+    /// Space invaders
+    invaders: Vec<Invader>,
+    /// Fibonacci spiral angle
+    fibonacci_angle: f32,
+    /// Mandelbrot offset
+    mandelbrot_offset: (f32, f32),
+    /// Hex grid phase
+    hex_phase: f32,
+    /// Rose curve parameters
+    rose_angle: f32,
+    /// Butterflies
+    butterflies: Vec<Butterfly>,
+    /// Spider web strands
+    web_strands: Vec<WebStrand>,
+    /// Vines
+    vines: Vec<Vine>,
+    /// Moss cells
+    moss: Vec<MossCell>,
+    /// Radar sweep angle
+    radar_angle: f32,
+    /// Binary clock time
+    binary_time: u64,
+    /// Signal waves
+    signals: Vec<SignalWave>,
+    /// Wifi waves
+    wifi_waves: Vec<WifiWave>,
+    /// Paint splatters
+    splatters: Vec<PaintSplatter>,
+    /// Ink drops
+    ink_drops: Vec<InkDrop>,
+    /// Mosaic tiles
+    mosaic_tiles: Vec<MosaicTile>,
+    /// Stained glass
+    glass_panels: Vec<GlassPanel>,
+    /// Hologram scanline
+    hologram_line: u16,
+    /// Glitch timer
+    glitch_timer: u8,
+    /// Old film scratches
+    scratches: Vec<FilmScratch>,
+    /// Thermal noise
+    thermal_noise: Vec<u8>,
     /// Last update time
     last_update: std::time::Instant,
 }
@@ -990,6 +1096,167 @@ struct LissajousCurve {
     delta: f32,
     t: f32,
     color: u8,
+}
+
+// New animation structs for v1.1.5
+struct FlameParticle {
+    x: f32,
+    _y: f32,
+    height: f32,
+    intensity: u8,
+}
+
+struct Spark {
+    x: f32,
+    y: f32,
+    vx: f32,
+    vy: f32,
+    life: u8,
+    brightness: u8,
+}
+
+struct LavaBlob {
+    x: f32,
+    y: f32,
+    size: f32,
+    dy: f32,
+    color_phase: f32,
+}
+
+struct Meteor {
+    x: f32,
+    y: f32,
+    vx: f32,
+    vy: f32,
+    tail_length: u8,
+    brightness: u8,
+}
+
+struct Satellite {
+    x: f32,
+    y: f32,
+    angle: f32,
+    orbit_radius: f32,
+    signal_timer: u8,
+}
+
+struct PongGame {
+    ball_x: f32,
+    ball_y: f32,
+    ball_vx: f32,
+    ball_vy: f32,
+    paddle1_y: f32,
+    paddle2_y: f32,
+    score1: u8,
+    score2: u8,
+}
+
+struct SnakeGame {
+    segments: Vec<(u16, u16)>,
+    direction: u8, // 0=up, 1=right, 2=down, 3=left
+    food: (u16, u16),
+    tick_count: u8,
+}
+
+struct TetrisGame {
+    pieces: Vec<(u16, u16, u8)>, // x, y, piece_type
+    falling_piece: Option<(u16, u16, u8)>,
+    tick_count: u8,
+}
+
+struct Invader {
+    x: f32,
+    y: f32,
+    invader_type: u8,
+    direction: i8,
+    anim_frame: bool,
+}
+
+struct Butterfly {
+    x: f32,
+    y: f32,
+    target_x: f32,
+    target_y: f32,
+    wing_open: bool,
+    color: u8,
+}
+
+struct WebStrand {
+    x1: f32,
+    y1: f32,
+    x2: f32,
+    y2: f32,
+    vibration: f32,
+}
+
+struct Vine {
+    x: f32,
+    _y: f32,
+    length: u16,
+    growth_rate: f32,
+    max_length: u16,
+}
+
+struct MossCell {
+    x: u16,
+    y: u16,
+    age: u8,
+    spreading: bool,
+}
+
+struct SignalWave {
+    x: u16,
+    y: u16,
+    radius: f32,
+    max_radius: f32,
+    amplitude: u8,
+}
+
+struct WifiWave {
+    _center_x: f32,
+    _center_y: f32,
+    radius: f32,
+    intensity: u8,
+}
+
+struct PaintSplatter {
+    x: u16,
+    y: u16,
+    size: u8,
+    color: (u8, u8, u8),
+    age: u8,
+}
+
+struct InkDrop {
+    x: f32,
+    y: f32,
+    radius: f32,
+    max_radius: f32,
+    color: (u8, u8, u8),
+}
+
+struct MosaicTile {
+    x: u16,
+    y: u16,
+    color: (u8, u8, u8),
+    changing: bool,
+    change_timer: u8,
+}
+
+struct GlassPanel {
+    x: u16,
+    y: u16,
+    width: u16,
+    height: u16,
+    hue: u8,
+    light_intensity: u8,
+}
+
+struct FilmScratch {
+    x: u16,
+    y: u16,
+    length: u8,
+    visible: bool,
 }
 
 struct GameOfLifeCell {
@@ -1409,6 +1676,58 @@ impl App {
                 "perlin_flow" => false,
                 "cube_3d" => false,
                 "fractals" => false,
+                // New animations v1.1.5
+                "ocean" => false,
+                "ripple" => false,
+                "fog" => false,
+                "flames" => {
+                    self.animation_state.flames.is_empty() && self.config.animation.density > 0
+                }
+                "sparks" => {
+                    self.animation_state.sparks.is_empty() && self.config.animation.density > 0
+                }
+                "lava_lamp" => {
+                    self.animation_state.lava_blobs.is_empty() && self.config.animation.density > 0
+                }
+                "sun" => false,
+                "galaxy" => false,
+                "meteor_shower" => {
+                    self.animation_state.meteors.is_empty() && self.config.animation.density > 0
+                }
+                "satellite" => false,
+                "pulsar" => false,
+                "pong" => false,
+                "snake" => self.animation_state.snake.segments.is_empty(),
+                "tetris" => false,
+                "invaders" => {
+                    self.animation_state.invaders.is_empty() && self.config.animation.density > 0
+                }
+                "fibonacci" => false,
+                "mandelbrot" => false,
+                "hex_grid" => false,
+                "rose" => false,
+                "butterflies" => {
+                    self.animation_state.butterflies.is_empty() && self.config.animation.density > 0
+                }
+                "spider_web" => {
+                    self.animation_state.web_strands.is_empty() && self.config.animation.density > 0
+                }
+                "vine_growth" => {
+                    self.animation_state.vines.is_empty() && self.config.animation.density > 0
+                }
+                "moss" => self.animation_state.moss.is_empty() && self.config.animation.density > 0,
+                "radar" => false,
+                "binary_clock" => false,
+                "signal" => self.animation_state.signals.is_empty(),
+                "wifi" => false,
+                "paint_splatter" => false,
+                "ink_bleed" => false,
+                "mosaic" => self.animation_state.mosaic_tiles.is_empty(),
+                "stained_glass" => self.animation_state.glass_panels.is_empty(),
+                "hologram" => false,
+                "glitch" => false,
+                "old_film" => false,
+                "thermal" => false,
                 _ => false,
             };
 
@@ -1456,6 +1775,46 @@ impl App {
             "perlin_flow" => self.animation_state.update_perlin_flow(),
             "cube_3d" => self.animation_state.update_cube_3d(),
             "fractals" => self.animation_state.update_fractals(),
+            // New animations v1.1.5
+            "ocean" => self.animation_state.update_ocean(),
+            "ripple" => self.animation_state.update_ripple(area, &self.config),
+            "fog" => self.animation_state.update_fog(),
+            "flames" => self.animation_state.update_flames(area, &self.config),
+            "sparks" => self.animation_state.update_sparks(area, &self.config),
+            "lava_lamp" => self.animation_state.update_lava_lamp(area, &self.config),
+            "sun" => self.animation_state.update_sun(),
+            "galaxy" => self.animation_state.update_galaxy(),
+            "meteor_shower" => self
+                .animation_state
+                .update_meteor_shower(area, &self.config),
+            "satellite" => self.animation_state.update_satellite(area, &self.config),
+            "pulsar" => self.animation_state.update_pulsar(),
+            "pong" => self.animation_state.update_pong(area, &self.config),
+            "snake" => self.animation_state.update_snake(area, &self.config),
+            "tetris" => self.animation_state.update_tetris(area, &self.config),
+            "invaders" => self.animation_state.update_invaders(area, &self.config),
+            "fibonacci" => self.animation_state.update_fibonacci(),
+            "mandelbrot" => self.animation_state.update_mandelbrot(),
+            "hex_grid" => self.animation_state.update_hex_grid(),
+            "rose" => self.animation_state.update_rose(),
+            "butterflies" => self.animation_state.update_butterflies(area, &self.config),
+            "spider_web" => self.animation_state.update_spider_web(),
+            "vine_growth" => self.animation_state.update_vine_growth(area, &self.config),
+            "moss" => self.animation_state.update_moss(area, &self.config),
+            "radar" => self.animation_state.update_radar(),
+            "binary_clock" => self.animation_state.update_binary_clock(),
+            "signal" => self.animation_state.update_signal(area, &self.config),
+            "wifi" => self.animation_state.update_wifi(),
+            "paint_splatter" => self
+                .animation_state
+                .update_paint_splatter(area, &self.config),
+            "ink_bleed" => self.animation_state.update_ink_bleed(area, &self.config),
+            "mosaic" => self.animation_state.update_mosaic(),
+            "stained_glass" => self.animation_state.update_stained_glass(),
+            "hologram" => self.animation_state.update_hologram(area),
+            "glitch" => self.animation_state.update_glitch(),
+            "old_film" => self.animation_state.update_old_film(area, &self.config),
+            "thermal" => self.animation_state.update_thermal(area),
             _ => {}
         }
     }
@@ -1611,6 +1970,66 @@ impl AnimationState {
                 angle_z: 0.0,
             },
             fractal_offset: (0.0, 0.0),
+            // New animations v1.1.5
+            ocean_phase: 0.0,
+            ripple_radius: 0.0,
+            fog_density: 0.5,
+            flames: Vec::new(),
+            sparks: Vec::new(),
+            lava_blobs: Vec::new(),
+            sun_phase: 0.0,
+            galaxy_angle: 0.0,
+            meteors: Vec::new(),
+            satellite: Satellite {
+                x: 0.0,
+                y: 0.0,
+                angle: 0.0,
+                orbit_radius: 10.0,
+                signal_timer: 0,
+            },
+            pulsar_angle: 0.0,
+            pong: PongGame {
+                ball_x: 40.0,
+                ball_y: 12.0,
+                ball_vx: 0.5,
+                ball_vy: 0.3,
+                paddle1_y: 10.0,
+                paddle2_y: 10.0,
+                score1: 0,
+                score2: 0,
+            },
+            snake: SnakeGame {
+                segments: Vec::new(),
+                direction: 1,
+                food: (20, 10),
+                tick_count: 0,
+            },
+            tetris: TetrisGame {
+                pieces: Vec::new(),
+                falling_piece: None,
+                tick_count: 0,
+            },
+            invaders: Vec::new(),
+            fibonacci_angle: 0.0,
+            mandelbrot_offset: (-0.5, 0.0),
+            hex_phase: 0.0,
+            rose_angle: 0.0,
+            butterflies: Vec::new(),
+            web_strands: Vec::new(),
+            vines: Vec::new(),
+            moss: Vec::new(),
+            radar_angle: 0.0,
+            binary_time: 0,
+            signals: Vec::new(),
+            wifi_waves: Vec::new(),
+            splatters: Vec::new(),
+            ink_drops: Vec::new(),
+            mosaic_tiles: Vec::new(),
+            glass_panels: Vec::new(),
+            hologram_line: 0,
+            glitch_timer: 0,
+            scratches: Vec::new(),
+            thermal_noise: Vec::new(),
             last_update: std::time::Instant::now(),
         }
     }
@@ -1983,6 +2402,325 @@ impl AnimationState {
             }
             "fractals" => {
                 self.fractal_offset = (0.0, 0.0);
+            }
+            // New animations v1.1.5
+            "ocean" => {
+                self.ocean_phase = 0.0;
+            }
+            "ripple" => {
+                self.ripple_radius = 0.0;
+            }
+            "fog" => {
+                self.fog_density = 0.5;
+            }
+            "flames" => {
+                let density = config.animation.density as usize;
+                let count = (density / 2).max(5);
+                self.flames.clear();
+                for _ in 0..count {
+                    self.flames.push(FlameParticle {
+                        x: rng.gen_range(0.0..area.width as f32),
+                        _y: area.height as f32,
+                        height: rng.gen_range(3.0..10.0),
+                        intensity: rng.gen_range(150..255),
+                    });
+                }
+            }
+            "sparks" => {
+                let density = config.animation.density as usize;
+                let count = (density / 3).max(3);
+                self.sparks.clear();
+                for _ in 0..count {
+                    self.sparks.push(Spark {
+                        x: rng.gen_range(0.0..area.width as f32),
+                        y: rng.gen_range(area.height as f32 / 2.0..area.height as f32),
+                        vx: rng.gen_range(-0.5..0.5),
+                        vy: rng.gen_range(-2.0..-0.5),
+                        life: rng.gen_range(20..60),
+                        brightness: rng.gen_range(200..255),
+                    });
+                }
+            }
+            "lava_lamp" => {
+                let density = config.animation.density as usize;
+                let count = (density / 10).max(2);
+                self.lava_blobs.clear();
+                for _ in 0..count {
+                    self.lava_blobs.push(LavaBlob {
+                        x: rng.gen_range(5.0..(area.width.saturating_sub(5)) as f32),
+                        y: rng.gen_range(5.0..(area.height.saturating_sub(5)) as f32),
+                        size: rng.gen_range(2.0..5.0),
+                        dy: rng.gen_range(-0.1..0.1),
+                        color_phase: rng.gen_range(0.0..std::f32::consts::TAU),
+                    });
+                }
+            }
+            "sun" => {
+                self.sun_phase = 0.0;
+            }
+            "galaxy" => {
+                self.galaxy_angle = 0.0;
+            }
+            "meteor_shower" => {
+                let density = config.animation.density as usize;
+                let count = (density / 5).max(2);
+                self.meteors.clear();
+                for _ in 0..count {
+                    self.meteors.push(Meteor {
+                        x: rng.gen_range(0.0..area.width as f32),
+                        y: rng.gen_range(0.0..(area.height / 2) as f32),
+                        vx: rng.gen_range(-1.0..1.0),
+                        vy: rng.gen_range(0.5..2.0),
+                        tail_length: rng.gen_range(3..8),
+                        brightness: rng.gen_range(200..255),
+                    });
+                }
+            }
+            "satellite" => {
+                self.satellite = Satellite {
+                    x: area.width as f32 / 2.0,
+                    y: area.height as f32 / 2.0,
+                    angle: 0.0,
+                    orbit_radius: (area.width.min(area.height) as f32 / 3.0).min(15.0),
+                    signal_timer: 0,
+                };
+            }
+            "pulsar" => {
+                self.pulsar_angle = 0.0;
+            }
+            "pong" => {
+                self.pong = PongGame {
+                    ball_x: area.width as f32 / 2.0,
+                    ball_y: area.height as f32 / 2.0,
+                    ball_vx: if rng.gen_bool(0.5) { 0.8 } else { -0.8 },
+                    ball_vy: if rng.gen_bool(0.5) { 0.5 } else { -0.5 },
+                    paddle1_y: area.height as f32 / 2.0,
+                    paddle2_y: area.height as f32 / 2.0,
+                    score1: 0,
+                    score2: 0,
+                };
+            }
+            "snake" => {
+                let start_x = area.width / 2;
+                let start_y = area.height / 2;
+                self.snake = SnakeGame {
+                    segments: vec![
+                        (start_x, start_y),
+                        (start_x - 1, start_y),
+                        (start_x - 2, start_y),
+                    ],
+                    direction: 1,
+                    food: (
+                        rng.gen_range(5..area.width - 5),
+                        rng.gen_range(3..area.height - 3),
+                    ),
+                    tick_count: 0,
+                };
+            }
+            "tetris" => {
+                self.tetris = TetrisGame {
+                    pieces: Vec::new(),
+                    falling_piece: Some((area.width / 2, 0, rng.gen_range(0..7))),
+                    tick_count: 0,
+                };
+            }
+            "invaders" => {
+                let density = config.animation.density as usize;
+                let rows = 3;
+                let cols = (density / 10).max(3).min(8);
+                self.invaders.clear();
+                for row in 0..rows {
+                    for col in 0..cols {
+                        self.invaders.push(Invader {
+                            x: (5 + col * 6) as f32,
+                            y: (2 + row * 3) as f32,
+                            invader_type: (row as u8) % 3,
+                            direction: 1,
+                            anim_frame: false,
+                        });
+                    }
+                }
+            }
+            "fibonacci" => {
+                self.fibonacci_angle = 0.0;
+            }
+            "mandelbrot" => {
+                self.mandelbrot_offset = (-0.5, 0.0);
+            }
+            "hex_grid" => {
+                self.hex_phase = 0.0;
+            }
+            "rose" => {
+                self.rose_angle = 0.0;
+            }
+            "butterflies" => {
+                let density = config.animation.density as usize;
+                let count = (density / 5).max(3);
+                self.butterflies.clear();
+                for _ in 0..count {
+                    self.butterflies.push(Butterfly {
+                        x: rng.gen_range(5.0..(area.width.saturating_sub(5)) as f32),
+                        y: rng.gen_range(3.0..(area.height.saturating_sub(3)) as f32),
+                        target_x: rng.gen_range(5.0..(area.width.saturating_sub(5)) as f32),
+                        target_y: rng.gen_range(3.0..(area.height.saturating_sub(3)) as f32),
+                        wing_open: true,
+                        color: rng.gen_range(0..255),
+                    });
+                }
+            }
+            "spider_web" => {
+                self.web_strands.clear();
+                let center_x = area.width as f32 / 2.0;
+                let center_y = area.height as f32 / 2.0;
+                let radius = (area.width.min(area.height) as f32 / 3.0).min(12.0);
+                // Radial strands
+                for i in 0..8 {
+                    let angle = (i as f32) * std::f32::consts::PI / 4.0;
+                    self.web_strands.push(WebStrand {
+                        x1: center_x,
+                        y1: center_y,
+                        x2: center_x + angle.cos() * radius,
+                        y2: center_y + angle.sin() * radius,
+                        vibration: 0.0,
+                    });
+                }
+                // Spiral strands
+                for r in (2..=radius as i32).step_by(3) {
+                    let r = r as f32;
+                    for i in 0..8 {
+                        let angle1 = (i as f32) * std::f32::consts::PI / 4.0;
+                        let angle2 = ((i + 1) as f32) * std::f32::consts::PI / 4.0;
+                        self.web_strands.push(WebStrand {
+                            x1: center_x + angle1.cos() * r,
+                            y1: center_y + angle1.sin() * r,
+                            x2: center_x + angle2.cos() * r,
+                            y2: center_y + angle2.sin() * r,
+                            vibration: 0.0,
+                        });
+                    }
+                }
+            }
+            "vine_growth" => {
+                self.vines.clear();
+                let density = config.animation.density as usize;
+                let count = (density / 15).max(2);
+                for _ in 0..count {
+                    self.vines.push(Vine {
+                        x: rng.gen_range(0.0..area.width as f32),
+                        _y: area.height as f32,
+                        length: 0,
+                        growth_rate: rng.gen_range(0.1..0.3),
+                        max_length: rng.gen_range(10..area.height.min(30)),
+                    });
+                }
+            }
+            "moss" => {
+                self.moss.clear();
+                let density = config.animation.density as usize;
+                let count = ((area.width as usize * area.height as usize * density) / 2000).max(10);
+                for _ in 0..count {
+                    self.moss.push(MossCell {
+                        x: rng.gen_range(0..area.width),
+                        y: rng.gen_range((area.height / 2)..area.height),
+                        age: rng.gen_range(0..50),
+                        spreading: rng.gen_bool(0.3),
+                    });
+                }
+            }
+            "radar" => {
+                self.radar_angle = 0.0;
+            }
+            "binary_clock" => {
+                self.binary_time = 0;
+            }
+            "signal" => {
+                self.signals.clear();
+                let density = config.animation.density as usize;
+                let count = (density / 10).max(2);
+                for _ in 0..count {
+                    self.signals.push(SignalWave {
+                        x: rng.gen_range(5..area.width - 5),
+                        y: area.height / 2,
+                        radius: 0.0,
+                        max_radius: rng.gen_range(10.0..30.0),
+                        amplitude: rng.gen_range(100..200),
+                    });
+                }
+            }
+            "wifi" => {
+                self.wifi_waves.clear();
+                for i in 0..3 {
+                    self.wifi_waves.push(WifiWave {
+                        _center_x: area.width as f32 / 2.0,
+                        _center_y: area.height as f32 / 2.0,
+                        radius: i as f32 * 3.0,
+                        intensity: 200 - (i * 50) as u8,
+                    });
+                }
+            }
+            "paint_splatter" => {
+                self.splatters.clear();
+            }
+            "ink_bleed" => {
+                self.ink_drops.clear();
+            }
+            "mosaic" => {
+                self.mosaic_tiles.clear();
+                let tile_size = 4u16;
+                for y in (0..area.height).step_by(tile_size as usize) {
+                    for x in (0..area.width).step_by(tile_size as usize) {
+                        self.mosaic_tiles.push(MosaicTile {
+                            x,
+                            y,
+                            color: (
+                                rng.gen_range(50..200),
+                                rng.gen_range(50..200),
+                                rng.gen_range(50..200),
+                            ),
+                            changing: false,
+                            change_timer: 0,
+                        });
+                    }
+                }
+            }
+            "stained_glass" => {
+                self.glass_panels.clear();
+                let panel_width = area.width / 4;
+                let panel_height = area.height / 3;
+                for row in 0..3 {
+                    for col in 0..4 {
+                        self.glass_panels.push(GlassPanel {
+                            x: col * panel_width,
+                            y: row * panel_height,
+                            width: panel_width,
+                            height: panel_height,
+                            hue: rng.gen_range(0..255),
+                            light_intensity: rng.gen_range(100..200),
+                        });
+                    }
+                }
+            }
+            "hologram" => {
+                self.hologram_line = 0;
+            }
+            "glitch" => {
+                self.glitch_timer = 0;
+            }
+            "old_film" => {
+                self.scratches.clear();
+                for _ in 0..5 {
+                    self.scratches.push(FilmScratch {
+                        x: rng.gen_range(0..area.width),
+                        y: rng.gen_range(0..area.height),
+                        length: rng.gen_range(3..10),
+                        visible: rng.gen_bool(0.5),
+                    });
+                }
+            }
+            "thermal" => {
+                self.thermal_noise.clear();
+                let count = (area.width * area.height) as usize;
+                self.thermal_noise = (0..count).map(|_| rng.gen_range(0..255)).collect();
             }
             _ => {}
         }
@@ -2812,6 +3550,1777 @@ impl AnimationState {
         self.fractal_offset.0 += 0.002;
         self.fractal_offset.1 += 0.001;
     }
+
+    // New update methods for v1.1.5 animations
+    fn update_ocean(&mut self) {
+        self.ocean_phase += 0.05;
+    }
+
+    fn update_ripple(&mut self, area: Rect, _config: &Config) {
+        self.ripple_radius += 0.5;
+        if self.ripple_radius > (area.width.max(area.height) as f32) {
+            self.ripple_radius = 0.0;
+        }
+    }
+
+    fn update_fog(&mut self) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        self.fog_density += rng.gen_range(-0.02..0.02);
+        self.fog_density = self.fog_density.clamp(0.3, 0.8);
+    }
+
+    fn update_flames(&mut self, area: Rect, config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for flame in &mut self.flames {
+            flame.height += rng.gen_range(-0.5..0.5);
+            flame.height = flame.height.clamp(3.0, 15.0);
+            flame.intensity =
+                (flame.intensity as i16 + rng.gen_range(-10..10)).clamp(100, 255) as u8;
+        }
+
+        let target_count = (config.animation.density as usize / 2).max(5);
+        while self.flames.len() < target_count {
+            self.flames.push(FlameParticle {
+                x: rng.gen_range(0.0..area.width as f32),
+                _y: area.height as f32,
+                height: rng.gen_range(3.0..10.0),
+                intensity: rng.gen_range(150..255),
+            });
+        }
+    }
+
+    fn update_sparks(&mut self, area: Rect, config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for spark in &mut self.sparks {
+            spark.x += spark.vx;
+            spark.y += spark.vy;
+            spark.vy += 0.05; // gravity
+            spark.life = spark.life.saturating_sub(1);
+            spark.brightness = spark.brightness.saturating_sub(2);
+        }
+
+        self.sparks.retain(|s| s.life > 0 && s.y > 0.0);
+
+        let target_count = (config.animation.density as usize / 3).max(3);
+        while self.sparks.len() < target_count {
+            self.sparks.push(Spark {
+                x: rng.gen_range(0.0..area.width as f32),
+                y: rng.gen_range(area.height as f32 / 2.0..area.height as f32),
+                vx: rng.gen_range(-0.5..0.5),
+                vy: rng.gen_range(-2.0..-0.5),
+                life: rng.gen_range(20..60),
+                brightness: rng.gen_range(200..255),
+            });
+        }
+    }
+
+    fn update_lava_lamp(&mut self, area: Rect, _config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for blob in &mut self.lava_blobs {
+            blob.y += blob.dy;
+            blob.color_phase += 0.02;
+
+            // Bounce off top and bottom
+            if blob.y <= blob.size || blob.y >= area.height as f32 - blob.size {
+                blob.dy = -blob.dy;
+            }
+
+            // Random direction change
+            if rng.gen_bool(0.02) {
+                blob.dy += rng.gen_range(-0.05..0.05);
+                blob.dy = blob.dy.clamp(-0.3, 0.3);
+            }
+        }
+    }
+
+    fn update_sun(&mut self) {
+        self.sun_phase += 0.03;
+    }
+
+    fn update_galaxy(&mut self) {
+        self.galaxy_angle += 0.01;
+    }
+
+    fn update_meteor_shower(&mut self, area: Rect, config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for meteor in &mut self.meteors {
+            meteor.x += meteor.vx;
+            meteor.y += meteor.vy;
+        }
+
+        // Remove meteors that went off screen
+        self.meteors.retain(|m| {
+            m.y < area.height as f32 + 5.0 && m.x > -5.0 && m.x < area.width as f32 + 5.0
+        });
+
+        // Spawn new meteors
+        let target_count = (config.animation.density as usize / 5).max(2);
+        if self.meteors.len() < target_count && rng.gen_bool(0.1) {
+            self.meteors.push(Meteor {
+                x: rng.gen_range(-5.0..area.width as f32),
+                y: rng.gen_range(-5.0..(area.height / 2) as f32),
+                vx: rng.gen_range(-1.0..1.0),
+                vy: rng.gen_range(0.5..2.0),
+                tail_length: rng.gen_range(3..8),
+                brightness: rng.gen_range(200..255),
+            });
+        }
+    }
+
+    fn update_satellite(&mut self, area: Rect, _config: &Config) {
+        self.satellite.angle += 0.02;
+        let cx = area.width as f32 / 2.0;
+        let cy = area.height as f32 / 2.0;
+        self.satellite.x = cx + self.satellite.angle.cos() * self.satellite.orbit_radius;
+        self.satellite.y = cy + self.satellite.angle.sin() * self.satellite.orbit_radius * 0.5;
+        self.satellite.signal_timer = self.satellite.signal_timer.saturating_sub(1);
+    }
+
+    fn update_pulsar(&mut self) {
+        self.pulsar_angle += 0.05;
+    }
+
+    fn update_pong(&mut self, area: Rect, _config: &Config) {
+        // fog uses randomness in render
+
+        // Move ball
+        self.pong.ball_x += self.pong.ball_vx;
+        self.pong.ball_y += self.pong.ball_vy;
+
+        // Bounce off top/bottom
+        if self.pong.ball_y <= 1.0 || self.pong.ball_y >= area.height as f32 - 1.0 {
+            self.pong.ball_vy = -self.pong.ball_vy;
+        }
+
+        // Bounce off paddles
+        if self.pong.ball_x <= 2.0 {
+            if (self.pong.ball_y - self.pong.paddle1_y).abs() < 3.0 {
+                self.pong.ball_vx = -self.pong.ball_vx;
+            } else {
+                // Reset ball
+                self.pong.ball_x = area.width as f32 / 2.0;
+                self.pong.ball_y = area.height as f32 / 2.0;
+                self.pong.ball_vx = 0.8;
+                self.pong.score2 += 1;
+            }
+        } else if self.pong.ball_x >= area.width as f32 - 2.0 {
+            if (self.pong.ball_y - self.pong.paddle2_y).abs() < 3.0 {
+                self.pong.ball_vx = -self.pong.ball_vx;
+            } else {
+                // Reset ball
+                self.pong.ball_x = area.width as f32 / 2.0;
+                self.pong.ball_y = area.height as f32 / 2.0;
+                self.pong.ball_vx = -0.8;
+                self.pong.score1 += 1;
+            }
+        }
+
+        // Move AI paddles towards ball
+        if self.pong.paddle1_y < self.pong.ball_y - 1.0 {
+            self.pong.paddle1_y += 0.4;
+        } else if self.pong.paddle1_y > self.pong.ball_y + 1.0 {
+            self.pong.paddle1_y -= 0.4;
+        }
+
+        if self.pong.paddle2_y < self.pong.ball_y - 1.0 {
+            self.pong.paddle2_y += 0.4;
+        } else if self.pong.paddle2_y > self.pong.ball_y + 1.0 {
+            self.pong.paddle2_y -= 0.4;
+        }
+
+        // Clamp paddles
+        self.pong.paddle1_y = self.pong.paddle1_y.clamp(2.0, area.height as f32 - 3.0);
+        self.pong.paddle2_y = self.pong.paddle2_y.clamp(2.0, area.height as f32 - 3.0);
+    }
+
+    fn update_snake(&mut self, area: Rect, _config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        self.snake.tick_count += 1;
+        if self.snake.tick_count < 3 {
+            return;
+        }
+        self.snake.tick_count = 0;
+
+        // Move snake
+        let head = self.snake.segments[0];
+        let new_head = match self.snake.direction {
+            0 => (head.0, head.1.saturating_sub(1)),
+            1 => ((head.0 + 1).min(area.width - 1), head.1),
+            2 => (head.0, (head.1 + 1).min(area.height - 1)),
+            _ => (head.0.saturating_sub(1), head.1),
+        };
+
+        // Check food collision
+        if new_head == self.snake.food {
+            self.snake.segments.insert(0, new_head);
+            self.snake.food = (
+                rng.gen_range(5..area.width - 5),
+                rng.gen_range(3..area.height - 3),
+            );
+        } else {
+            self.snake.segments.pop();
+            self.snake.segments.insert(0, new_head);
+        }
+
+        // Random direction change occasionally
+        if rng.gen_bool(0.1) {
+            self.snake.direction = rng.gen_range(0..4);
+        }
+    }
+
+    fn update_tetris(&mut self, area: Rect, _config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        self.tetris.tick_count += 1;
+        if self.tetris.tick_count < 5 {
+            return;
+        }
+        self.tetris.tick_count = 0;
+
+        if let Some((x, y, piece_type)) = self.tetris.falling_piece {
+            let new_y = y + 1;
+            if new_y >= area.height - 1 {
+                self.tetris.pieces.push((x, y, piece_type));
+                self.tetris.falling_piece = Some((area.width / 2, 0, rng.gen_range(0..7)));
+            } else {
+                self.tetris.falling_piece = Some((x, new_y, piece_type));
+            }
+        }
+    }
+
+    fn update_invaders(&mut self, area: Rect, _config: &Config) {
+        // paint_splatter uses randomness in render
+
+        let move_down = self.invaders.iter().any(|i| {
+            (i.x <= 2.0 && i.direction < 0) || (i.x >= area.width as f32 - 3.0 && i.direction > 0)
+        });
+
+        for invader in &mut self.invaders {
+            if move_down {
+                invader.y += 1.0;
+                invader.direction = -invader.direction;
+            } else {
+                invader.x += invader.direction as f32 * 0.5;
+            }
+            if self.tick % 10 == 0 {
+                invader.anim_frame = !invader.anim_frame;
+            }
+        }
+
+        // Reset if all went off bottom
+        if self.invaders.iter().all(|i| i.y > area.height as f32) {
+            self.invaders.clear();
+            for row in 0..3 {
+                for col in 0..5 {
+                    self.invaders.push(Invader {
+                        x: (5 + col * 6) as f32,
+                        y: (2 + row * 3) as f32,
+                        invader_type: (row as u8) % 3,
+                        direction: 1,
+                        anim_frame: false,
+                    });
+                }
+            }
+        }
+    }
+
+    fn update_fibonacci(&mut self) {
+        self.fibonacci_angle += 0.02;
+    }
+
+    fn update_mandelbrot(&mut self) {
+        self.mandelbrot_offset.0 += 0.001;
+    }
+
+    fn update_hex_grid(&mut self) {
+        self.hex_phase += 0.03;
+    }
+
+    fn update_rose(&mut self) {
+        self.rose_angle += 0.02;
+    }
+
+    fn update_butterflies(&mut self, area: Rect, _config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for butterfly in &mut self.butterflies {
+            // Move towards target
+            let dx = butterfly.target_x - butterfly.x;
+            let dy = butterfly.target_y - butterfly.y;
+            butterfly.x += dx * 0.02;
+            butterfly.y += dy * 0.02;
+
+            // Flap wings
+            if self.tick % 5 == 0 {
+                butterfly.wing_open = !butterfly.wing_open;
+            }
+
+            // New target if close
+            if dx.abs() < 1.0 && dy.abs() < 1.0 {
+                butterfly.target_x = rng.gen_range(5.0..(area.width.saturating_sub(5)) as f32);
+                butterfly.target_y = rng.gen_range(3.0..(area.height.saturating_sub(3)) as f32);
+            }
+        }
+    }
+
+    fn update_spider_web(&mut self) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        for strand in &mut self.web_strands {
+            strand.vibration = rng.gen_range(-0.1..0.1);
+        }
+    }
+
+    fn update_vine_growth(&mut self, area: Rect, _config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for vine in &mut self.vines {
+            vine.length = (vine.length as f32 + vine.growth_rate) as u16;
+            if vine.length >= vine.max_length {
+                vine.length = 0;
+                vine.x = rng.gen_range(0.0..area.width as f32);
+                vine._y = area.height as f32;
+            }
+        }
+    }
+
+    fn update_moss(&mut self, area: Rect, config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for cell in &mut self.moss {
+            cell.age = cell.age.saturating_add(1);
+        }
+
+        let target_count =
+            ((area.width as usize * area.height as usize * config.animation.density as usize)
+                / 2000)
+                .max(10);
+        if self.moss.len() < target_count && rng.gen_bool(0.1) {
+            self.moss.push(MossCell {
+                x: rng.gen_range(0..area.width),
+                y: rng.gen_range((area.height / 2)..area.height),
+                age: 0,
+                spreading: rng.gen_bool(0.3),
+            });
+        }
+    }
+
+    fn update_radar(&mut self) {
+        self.radar_angle += 0.05;
+    }
+
+    fn update_binary_clock(&mut self) {
+        self.binary_time += 1;
+    }
+
+    fn update_signal(&mut self, _area: Rect, _config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for signal in &mut self.signals {
+            signal.radius += 0.3;
+        }
+
+        self.signals.retain(|s| s.radius < s.max_radius);
+
+        if self.signals.len() < 2 && rng.gen_bool(0.05) {
+            self.signals.push(SignalWave {
+                x: rng.gen_range(5.._area.width - 5),
+                y: _area.height / 2,
+                radius: 0.0,
+                max_radius: rng.gen_range(10.0..30.0),
+                amplitude: rng.gen_range(100..200),
+            });
+        }
+    }
+
+    fn update_wifi(&mut self) {
+        for wave in &mut self.wifi_waves {
+            wave.radius += 0.2;
+            wave.intensity = wave.intensity.saturating_sub(1);
+        }
+
+        // Reset waves that got too big
+        for wave in &mut self.wifi_waves {
+            if wave.radius > 20.0 {
+                wave.radius = 0.0;
+                wave.intensity = 200;
+            }
+        }
+    }
+
+    fn update_paint_splatter(&mut self, area: Rect, config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for splatter in &mut self.splatters {
+            splatter.age = splatter.age.saturating_add(1);
+        }
+
+        self.splatters.retain(|s| s.age < 200);
+
+        let target_count = (config.animation.density as usize / 10).max(1);
+        if self.splatters.len() < target_count && rng.gen_bool(0.05) {
+            self.splatters.push(PaintSplatter {
+                x: rng.gen_range(0..area.width),
+                y: rng.gen_range(0..area.height),
+                size: rng.gen_range(1..4),
+                color: (
+                    rng.gen_range(100..255),
+                    rng.gen_range(100..255),
+                    rng.gen_range(100..255),
+                ),
+                age: 0,
+            });
+        }
+    }
+
+    fn update_ink_bleed(&mut self, area: Rect, _config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for drop in &mut self.ink_drops {
+            drop.radius += 0.1;
+        }
+
+        self.ink_drops.retain(|d| d.radius < d.max_radius);
+
+        if self.ink_drops.len() < 3 && rng.gen_bool(0.02) {
+            self.ink_drops.push(InkDrop {
+                x: rng.gen_range(5.0..(area.width - 5) as f32),
+                y: rng.gen_range(5.0..(area.height - 5) as f32),
+                radius: 0.5,
+                max_radius: rng.gen_range(3.0..8.0),
+                color: (
+                    rng.gen_range(0..100),
+                    rng.gen_range(0..100),
+                    rng.gen_range(100..200),
+                ),
+            });
+        }
+    }
+
+    fn update_mosaic(&mut self) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for tile in &mut self.mosaic_tiles {
+            if tile.changing {
+                tile.change_timer = tile.change_timer.saturating_sub(1);
+                if tile.change_timer == 0 {
+                    tile.changing = false;
+                    tile.color = (
+                        rng.gen_range(50..200),
+                        rng.gen_range(50..200),
+                        rng.gen_range(50..200),
+                    );
+                }
+            } else if rng.gen_bool(0.01) {
+                tile.changing = true;
+                tile.change_timer = rng.gen_range(10..30);
+            }
+        }
+    }
+
+    fn update_stained_glass(&mut self) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for panel in &mut self.glass_panels {
+            panel.light_intensity =
+                (panel.light_intensity as i16 + rng.gen_range(-5..5)).clamp(50, 255) as u8;
+        }
+    }
+
+    fn update_hologram(&mut self, area: Rect) {
+        self.hologram_line = (self.hologram_line + 1) % area.height;
+    }
+
+    fn update_glitch(&mut self) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        self.glitch_timer = rng.gen_range(0..10);
+    }
+
+    fn update_old_film(&mut self, area: Rect, _config: &Config) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+
+        for scratch in &mut self.scratches {
+            scratch.visible = rng.gen_bool(0.3);
+            scratch.y = (scratch.y + 1) % area.height;
+        }
+    }
+
+    fn update_thermal(&mut self, area: Rect) {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let count = (area.width * area.height) as usize;
+        if self.thermal_noise.len() != count {
+            self.thermal_noise = (0..count).map(|_| rng.gen_range(0..255)).collect();
+        }
+        for noise in &mut self.thermal_noise {
+            *noise = (*noise as i16 + rng.gen_range(-10..10)).clamp(0, 255) as u8;
+        }
+    }
+}
+
+// New render functions for v1.1.5 animations
+fn render_ocean(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(0, 20, 40)));
+    f.render_widget(bg_fill, size);
+
+    let phase = state.ocean_phase;
+    let wave_chars = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
+    for y in (size.height / 2)..size.height {
+        let wave_height =
+            ((y as f32 - size.height as f32 / 2.0) / (size.height as f32 / 2.0) * 8.0) as usize;
+        for x in 0..size.width {
+            let wave = ((x as f32 * 0.2 + phase + y as f32 * 0.1).sin() * 4.0 + 4.0) as usize;
+            let char_idx = (wave + wave_height).min(7);
+            let intensity = (150 + char_idx * 10) as u8;
+            let color = Color::Rgb(0, intensity / 2, intensity);
+            let span = Span::styled(wave_chars[char_idx].to_string(), Style::default().fg(color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(x, y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_ripple(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 15, 25)));
+    f.render_widget(bg_fill, size);
+
+    let center_x = size.width as f32 / 2.0;
+    let center_y = size.height as f32 / 2.0;
+    let radius = state.ripple_radius;
+
+    for ring in 0..5 {
+        let r = radius - ring as f32 * 4.0;
+        if r < 0.0 {
+            continue;
+        }
+        let intensity = (255 - ring * 40) as u8;
+        let ring_color = match color {
+            Color::Rgb(r, g, b) => Color::Rgb(
+                (r as u16 * intensity as u16 / 255) as u8,
+                (g as u16 * intensity as u16 / 255) as u8,
+                (b as u16 * intensity as u16 / 255) as u8,
+            ),
+            _ => Color::Rgb(intensity, intensity, intensity),
+        };
+
+        for angle in (0..360).step_by(10) {
+            let rad = angle as f32 * std::f32::consts::PI / 180.0;
+            let x = center_x + rad.cos() * r;
+            let y = center_y + rad.sin() * r * 0.5;
+
+            let px = x as u16;
+            let py = y as u16;
+            if px < size.width && py < size.height {
+                let span = Span::styled("◦", Style::default().fg(ring_color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(px, py, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+}
+
+fn render_fog(f: &mut Frame, state: &AnimationState, size: Rect) {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+
+    let density = state.fog_density;
+    for y in 0..size.height {
+        for x in 0..size.width {
+            if rng.gen_bool(density as f64 * 0.3) {
+                let alpha = rng.gen_range(50..150) as u8;
+                let color = Color::Rgb(alpha, alpha, alpha + 10);
+                let span = Span::styled("░", Style::default().fg(color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(x, y, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+}
+
+fn render_flames(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 5, 5)));
+    f.render_widget(bg_fill, size);
+
+    let flame_chars = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█', '▲', '◆'];
+    let colors = [
+        (255u8, 50u8, 0u8),
+        (255, 100, 0),
+        (255, 150, 0),
+        (255, 200, 0),
+        (255, 255, 100),
+    ];
+
+    for flame in &state.flames {
+        let x = flame.x as u16;
+        let height = flame.height as u16;
+        let intensity = flame.intensity;
+
+        for h in 0..height {
+            let y = size.height.saturating_sub(h + 1);
+            if y >= size.height || x >= size.width {
+                continue;
+            }
+
+            let color_idx = (h as f32 / height as f32 * colors.len() as f32) as usize;
+            let (rc, gc, bc) = colors[color_idx.min(colors.len() - 1)];
+            let r = (rc as u16 * intensity as u16 / 255) as u8;
+            let g = (gc as u16 * intensity as u16 / 255) as u8;
+            let b = (bc as u16 * intensity as u16 / 255) as u8;
+            let flame_color = Color::Rgb(r, g, b);
+
+            let char_idx = (h as f32 / height as f32 * flame_chars.len() as f32) as usize;
+            let ch = flame_chars[char_idx.min(flame_chars.len() - 1)];
+
+            let span = Span::styled(ch.to_string(), Style::default().fg(flame_color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(x, y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_sparks(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 5, 5)));
+    f.render_widget(bg_fill, size);
+
+    for spark in &state.sparks {
+        let x = spark.x as u16;
+        let y = spark.y as u16;
+        if x < size.width && y < size.height {
+            let intensity = spark.brightness;
+            let color = Color::Rgb(255, 200 + intensity / 5, intensity);
+            let span = Span::styled("✦", Style::default().fg(color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(x, y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_lava_lamp(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(20, 10, 10)));
+    f.render_widget(bg_fill, size);
+
+    for blob in &state.lava_blobs {
+        let x = blob.x as u16;
+        let y = blob.y as u16;
+        let size_blob = blob.size as u16;
+
+        let hue = (blob.color_phase.sin() * 0.5 + 0.5) * 60.0;
+        let r = 255u8;
+        let g = (hue * 2.0) as u8;
+        let b = 50u8;
+        let color = Color::Rgb(r, g, b);
+
+        for dy in 0..size_blob {
+            for dx in 0..size_blob {
+                let px = x + dx;
+                let py = y + dy;
+                if px < size.width && py < size.height {
+                    let span = Span::styled("●", Style::default().fg(color));
+                    let text = Line::from(vec![span]);
+                    let paragraph = Paragraph::new(text);
+                    let area = Rect::new(px, py, 1, 1);
+                    f.render_widget(paragraph, area);
+                }
+            }
+        }
+    }
+}
+
+fn render_sun(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(0, 10, 30)));
+    f.render_widget(bg_fill, size);
+
+    let center_x = size.width as f32 / 2.0;
+    let center_y = size.height as f32 / 2.0;
+    let pulse = state.sun_phase.sin() * 0.2 + 1.0;
+    let radius = (size.width.min(size.height) as f32 / 4.0) * pulse;
+
+    for y in 0..size.height {
+        for x in 0..size.width {
+            let dx = x as f32 - center_x;
+            let dy = y as f32 - center_y;
+            let dist = (dx * dx + dy * dy).sqrt();
+
+            if dist < radius {
+                let intensity = (1.0 - dist / radius) * 255.0;
+                let color = Color::Rgb(
+                    255,
+                    (200.0 + intensity * 0.2) as u8,
+                    (intensity * 0.5) as u8,
+                );
+                let ch = if dist < radius * 0.3 { "█" } else { "▓" };
+                let span = Span::styled(ch, Style::default().fg(color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(x, y, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+
+    // Sun rays
+    for i in 0..12 {
+        let angle = (i as f32 * 30.0 + state.sun_phase * 10.0) * std::f32::consts::PI / 180.0;
+        for r in (radius as u16 + 2)..(radius as u16 + 8) {
+            let x = center_x + angle.cos() * r as f32;
+            let y = center_y + angle.sin() * r as f32 * 0.5;
+            let px = x as u16;
+            let py = y as u16;
+            if px < size.width && py < size.height {
+                let span = Span::styled("│", Style::default().fg(Color::Rgb(255, 200, 100)));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(px, py, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+}
+
+fn render_galaxy(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 5, 15)));
+    f.render_widget(bg_fill, size);
+
+    let center_x = size.width as f32 / 2.0;
+    let center_y = size.height as f32 / 2.0;
+
+    // Spiral arms
+    for arm in 0..4 {
+        let arm_offset = arm as f32 * std::f32::consts::PI / 2.0;
+        for r in 1..30 {
+            let angle = r as f32 * 0.2 + state.galaxy_angle + arm_offset;
+            let x = center_x + angle.cos() * r as f32;
+            let y = center_y + angle.sin() * r as f32 * 0.5;
+            let px = x as u16;
+            let py = y as u16;
+            if px < size.width && py < size.height {
+                let intensity = (255 - r * 6) as u8;
+                let color = Color::Rgb(intensity, intensity / 2, intensity);
+                let span = Span::styled("•", Style::default().fg(color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(px, py, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+
+    // Center
+    let span = Span::styled("◉", Style::default().fg(Color::Rgb(255, 255, 200)));
+    let text = Line::from(vec![span]);
+    let paragraph = Paragraph::new(text);
+    let area = Rect::new(center_x as u16, center_y as u16, 1, 1);
+    f.render_widget(paragraph, area);
+}
+
+fn render_meteor_shower(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 5, 10)));
+    f.render_widget(bg_fill, size);
+
+    for meteor in &state.meteors {
+        let x = meteor.x as u16;
+        let y = meteor.y as u16;
+        if x < size.width && y < size.height {
+            let intensity = meteor.brightness;
+            let color = Color::Rgb(255, 255, intensity);
+            let span = Span::styled("☄", Style::default().fg(color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(x, y, 1, 1);
+            f.render_widget(paragraph, area);
+
+            // Tail
+            for t in 1..meteor.tail_length {
+                let tx = (meteor.x - meteor.vx * t as f32) as u16;
+                let ty = (meteor.y - meteor.vy * t as f32) as u16;
+                if tx < size.width && ty < size.height {
+                    let tail_intensity = intensity.saturating_sub(t * 20);
+                    let tail_color = Color::Rgb(tail_intensity, tail_intensity, tail_intensity / 2);
+                    let span = Span::styled("·", Style::default().fg(tail_color));
+                    let text = Line::from(vec![span]);
+                    let paragraph = Paragraph::new(text);
+                    let area = Rect::new(tx, ty, 1, 1);
+                    f.render_widget(paragraph, area);
+                }
+            }
+        }
+    }
+}
+
+fn render_satellite(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 5, 10)));
+    f.render_widget(bg_fill, size);
+
+    // Orbit path
+    let center_x = size.width as f32 / 2.0;
+    let center_y = size.height as f32 / 2.0;
+    let radius = state.satellite.orbit_radius;
+
+    for angle in (0..360).step_by(15) {
+        let rad = angle as f32 * std::f32::consts::PI / 180.0;
+        let x = center_x + rad.cos() * radius;
+        let y = center_y + rad.sin() * radius * 0.5;
+        let px = x as u16;
+        let py = y as u16;
+        if px < size.width && py < size.height {
+            let span = Span::styled("·", Style::default().fg(Color::Rgb(50, 50, 80)));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(px, py, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+
+    // Satellite
+    let x = state.satellite.x as u16;
+    let y = state.satellite.y as u16;
+    if x < size.width && y < size.height {
+        let span = Span::styled("🛰", Style::default().fg(Color::Rgb(200, 200, 220)));
+        let text = Line::from(vec![span]);
+        let paragraph = Paragraph::new(text);
+        let area = Rect::new(x, y, 1, 1);
+        f.render_widget(paragraph, area);
+
+        // Signal waves
+        if state.satellite.signal_timer % 20 < 10 {
+            for r in 1..=3 {
+                let sx = (state.satellite.x + r as f32) as u16;
+                if sx < size.width && y < size.height {
+                    let intensity = (200 - r * 50) as u8;
+                    let span = Span::styled(
+                        ")",
+                        Style::default().fg(Color::Rgb(intensity, intensity, intensity + 20)),
+                    );
+                    let text = Line::from(vec![span]);
+                    let paragraph = Paragraph::new(text);
+                    let area = Rect::new(sx, y, 1, 1);
+                    f.render_widget(paragraph, area);
+                }
+            }
+        }
+    }
+}
+
+fn render_pulsar(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 5, 10)));
+    f.render_widget(bg_fill, size);
+
+    let center_x = size.width as f32 / 2.0;
+    let center_y = size.height as f32 / 2.0;
+    let pulse = state.pulsar_angle.sin() * 0.5 + 0.5;
+
+    // Spinning beams
+    for i in 0..2 {
+        let beam_angle = state.pulsar_angle + i as f32 * std::f32::consts::PI;
+        for r in 0..20 {
+            let x = center_x + beam_angle.cos() * r as f32;
+            let y = center_y + beam_angle.sin() * r as f32 * 0.5;
+            let px = x as u16;
+            let py = y as u16;
+            if px < size.width && py < size.height {
+                let intensity = (pulse * 255.0) as u8;
+                let c = match color {
+                    Color::Rgb(r, g, b) => Color::Rgb(
+                        (r as u16 * intensity as u16 / 255) as u8,
+                        (g as u16 * intensity as u16 / 255) as u8,
+                        (b as u16 * intensity as u16 / 255) as u8,
+                    ),
+                    _ => Color::Rgb(intensity, intensity, intensity),
+                };
+                let span = Span::styled("█", Style::default().fg(c));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(px, py, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+
+    // Center pulsar
+    let center_intensity = (pulse * 255.0) as u8;
+    let span = Span::styled(
+        "◉",
+        Style::default().fg(Color::Rgb(255, 255, center_intensity)),
+    );
+    let text = Line::from(vec![span]);
+    let paragraph = Paragraph::new(text);
+    let area = Rect::new(center_x as u16, center_y as u16, 1, 1);
+    f.render_widget(paragraph, area);
+}
+
+fn render_pong(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 15, 10)));
+    f.render_widget(bg_fill, size);
+
+    // Paddles
+    for dy in -2..=2 {
+        let y1 = (state.pong.paddle1_y + dy as f32) as u16;
+        let y2 = (state.pong.paddle2_y + dy as f32) as u16;
+        if y1 < size.height {
+            let span = Span::styled("█", Style::default().fg(Color::Rgb(200, 200, 200)));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(1, y1, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+        if y2 < size.height {
+            let span = Span::styled("█", Style::default().fg(Color::Rgb(200, 200, 200)));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(size.width - 2, y2, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+
+    // Ball
+    let bx = state.pong.ball_x as u16;
+    let by = state.pong.ball_y as u16;
+    if bx < size.width && by < size.height {
+        let span = Span::styled("◆", Style::default().fg(Color::Rgb(255, 255, 100)));
+        let text = Line::from(vec![span]);
+        let paragraph = Paragraph::new(text);
+        let area = Rect::new(bx, by, 1, 1);
+        f.render_widget(paragraph, area);
+    }
+
+    // Score
+    let score_text = format!("{} : {}", state.pong.score1, state.pong.score2);
+    let span = Span::styled(score_text, Style::default().fg(Color::Rgb(150, 150, 150)));
+    let text = Line::from(vec![span]);
+    let paragraph = Paragraph::new(text);
+    let area = Rect::new(size.width / 2 - 3, 1, 7, 1);
+    f.render_widget(paragraph, area);
+}
+
+fn render_snake(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 20, 10)));
+    f.render_widget(bg_fill, size);
+
+    // Food
+    let (fx, fy) = state.snake.food;
+    if fx < size.width && fy < size.height {
+        let span = Span::styled("●", Style::default().fg(Color::Rgb(255, 50, 50)));
+        let text = Line::from(vec![span]);
+        let paragraph = Paragraph::new(text);
+        let area = Rect::new(fx, fy, 1, 1);
+        f.render_widget(paragraph, area);
+    }
+
+    // Snake body
+    for (i, (x, y)) in state.snake.segments.iter().enumerate() {
+        if *x < size.width && *y < size.height {
+            let color = if i == 0 {
+                Color::Rgb(100, 255, 100)
+            } else {
+                Color::Rgb(50, 200, 50)
+            };
+            let span = Span::styled("█", Style::default().fg(color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(*x, *y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_tetris(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(20, 20, 20)));
+    f.render_widget(bg_fill, size);
+
+    let piece_chars = ['█', '▓', '▒', '░', '◆', '●', '■'];
+    let piece_colors = [
+        Color::Rgb(255, 50, 50),
+        Color::Rgb(50, 255, 50),
+        Color::Rgb(50, 50, 255),
+        Color::Rgb(255, 255, 50),
+        Color::Rgb(255, 50, 255),
+        Color::Rgb(50, 255, 255),
+        Color::Rgb(255, 150, 50),
+    ];
+
+    // Placed pieces
+    for (x, y, piece_type) in &state.tetris.pieces {
+        if *x < size.width && *y < size.height {
+            let color = piece_colors[*piece_type as usize % piece_colors.len()];
+            let ch = piece_chars[*piece_type as usize % piece_chars.len()];
+            let span = Span::styled(ch.to_string(), Style::default().fg(color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(*x, *y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+
+    // Falling piece
+    if let Some((x, y, piece_type)) = state.tetris.falling_piece {
+        if x < size.width && y < size.height {
+            let color = piece_colors[piece_type as usize % piece_colors.len()];
+            let ch = piece_chars[piece_type as usize % piece_chars.len()];
+            let span = Span::styled(ch.to_string(), Style::default().fg(color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(x, y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_invaders(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 5, 5)));
+    f.render_widget(bg_fill, size);
+
+    let invader_chars = ['👾', '👽', '👻'];
+    let colors = [
+        Color::Rgb(255, 100, 100),
+        Color::Rgb(100, 255, 100),
+        Color::Rgb(100, 100, 255),
+    ];
+
+    for invader in &state.invaders {
+        let x = invader.x as u16;
+        let y = invader.y as u16;
+        if x < size.width && y < size.height {
+            let color = colors[invader.invader_type as usize % colors.len()];
+            let ch = invader_chars[invader.invader_type as usize % invader_chars.len()];
+            let span = Span::styled(ch.to_string(), Style::default().fg(color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(x, y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_fibonacci(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 10, 10)));
+    f.render_widget(bg_fill, size);
+
+    let center_x = size.width as f32 / 2.0;
+    let center_y = size.height as f32 / 2.0;
+    let golden_angle = 137.5_f32.to_radians();
+
+    for i in 0..200 {
+        let r = (i as f32).sqrt() * 0.8;
+        let theta = i as f32 * golden_angle + state.fibonacci_angle;
+        let x = center_x + r * theta.cos();
+        let y = center_y + r * theta.sin() * 0.5;
+
+        let px = x as u16;
+        let py = y as u16;
+        if px < size.width && py < size.height {
+            let intensity = (255 - i / 2) as u8;
+            let c = match color {
+                Color::Rgb(r, g, b) => Color::Rgb(
+                    (r as u16 * intensity as u16 / 255) as u8,
+                    (g as u16 * intensity as u16 / 255) as u8,
+                    (b as u16 * intensity as u16 / 255) as u8,
+                ),
+                _ => Color::Rgb(intensity, intensity, intensity),
+            };
+            let span = Span::styled("●", Style::default().fg(c));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(px, py, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_mandelbrot(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 5, 10)));
+    f.render_widget(bg_fill, size);
+
+    let offset_x = state.mandelbrot_offset.0;
+    let offset_y = state.mandelbrot_offset.1;
+
+    for py in 0..size.height {
+        for px in 0..size.width {
+            let x0 = (px as f32 / size.width as f32 - 0.5) * 3.0 + offset_x;
+            let y0 = (py as f32 / size.height as f32 - 0.5) * 2.0 + offset_y;
+
+            let mut x = 0.0;
+            let mut y = 0.0;
+            let mut iter = 0;
+
+            while x * x + y * y <= 4.0 && iter < 30 {
+                let xtemp = x * x - y * y + x0;
+                y = 2.0 * x * y + y0;
+                x = xtemp;
+                iter += 1;
+            }
+
+            if iter < 30 {
+                let intensity = (iter as f32 / 30.0 * 255.0) as u8;
+                let c = match color {
+                    Color::Rgb(r, g, b) => Color::Rgb(
+                        (r as u16 * intensity as u16 / 255) as u8,
+                        (g as u16 * intensity as u16 / 255) as u8,
+                        (b as u16 * intensity as u16 / 255) as u8,
+                    ),
+                    _ => Color::Rgb(intensity, intensity, intensity),
+                };
+                let chars = ['·', ':', '-', '=', '+', '*', '#', '%', '@'];
+                let ch = chars[iter as usize % chars.len()];
+                let span = Span::styled(ch.to_string(), Style::default().fg(c));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(px, py, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+}
+
+fn render_hex_grid(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 15, 20)));
+    f.render_widget(bg_fill, size);
+
+    let hex_chars = ['⬡', '⬢', '⬣'];
+    for y in 0..size.height {
+        for x in 0..size.width {
+            let wave = (x as f32 * 0.3 + y as f32 * 0.2 + state.hex_phase).sin() * 0.5 + 0.5;
+            if wave > 0.5 {
+                let char_idx = (wave * hex_chars.len() as f32) as usize % hex_chars.len();
+                let intensity = (wave * 200.0) as u8 + 50;
+                let color = Color::Rgb(intensity / 3, intensity / 2, intensity);
+                let span =
+                    Span::styled(hex_chars[char_idx].to_string(), Style::default().fg(color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(x, y, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+}
+
+fn render_rose(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 10, 15)));
+    f.render_widget(bg_fill, size);
+
+    let center_x = size.width as f32 / 2.0;
+    let center_y = size.height as f32 / 2.0;
+    let k = 5.0; // petals
+    let a = 10.0;
+
+    for theta in (0..720).step_by(2) {
+        let rad = theta as f32 * std::f32::consts::PI / 180.0 + state.rose_angle;
+        let r = a * (k * rad).cos();
+        let x = center_x + r * rad.cos();
+        let y = center_y + r * rad.sin() * 0.5;
+
+        let px = x as u16;
+        let py = y as u16;
+        if px < size.width && py < size.height {
+            let c = match color {
+                Color::Rgb(r, g, b) => Color::Rgb(r, g, b),
+                _ => Color::Rgb(255, 100, 150),
+            };
+            let span = Span::styled("●", Style::default().fg(c));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(px, py, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_butterflies(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(20, 25, 20)));
+    f.render_widget(bg_fill, size);
+
+    for butterfly in &state.butterflies {
+        let x = butterfly.x as u16;
+        let y = butterfly.y as u16;
+        if x < size.width && y < size.height {
+            let hue = butterfly.color as f32 / 255.0;
+            let r = ((hue * 6.0).sin() * 0.5 + 0.5) * 255.0;
+            let g = ((hue * 6.0 + 2.0).sin() * 0.5 + 0.5) * 255.0;
+            let b = ((hue * 6.0 + 4.0).sin() * 0.5 + 0.5) * 255.0;
+            let color = Color::Rgb(r as u8, g as u8, b as u8);
+
+            let ch = if butterfly.wing_open { '⌘' } else { '⍟' };
+            let span = Span::styled(ch.to_string(), Style::default().fg(color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(x, y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_spider_web(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(15, 15, 20)));
+    f.render_widget(bg_fill, size);
+
+    for strand in &state.web_strands {
+        let x1 = strand.x1 as u16;
+        let y1 = strand.y1 as u16;
+        let x2 = strand.x2 as u16;
+        let y2 = strand.y2 as u16;
+
+        // Simple line drawing
+        let dx = if x2 > x1 { x2 - x1 } else { x1 - x2 };
+        let dy = if y2 > y1 { y2 - y1 } else { y1 - y2 };
+        let steps = dx.max(dy);
+
+        for step in 0..=steps {
+            let t = if steps == 0 {
+                0.0
+            } else {
+                step as f32 / steps as f32
+            };
+            let x = (strand.x1 + (strand.x2 - strand.x1) * t) as u16;
+            let y = (strand.y1 + (strand.y2 - strand.y1) * t) as u16;
+            if x < size.width && y < size.height {
+                let intensity = (200.0 + strand.vibration * 500.0) as u8;
+                let color = Color::Rgb(intensity, intensity, intensity + 20);
+                let span = Span::styled("·", Style::default().fg(color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(x, y, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+}
+
+fn render_vine_growth(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 20, 10)));
+    f.render_widget(bg_fill, size);
+
+    let vine_chars = ['│', '├', '┤', '╱', '╲'];
+    let colors = [
+        Color::Rgb(50, 150, 50),
+        Color::Rgb(80, 180, 80),
+        Color::Rgb(100, 200, 100),
+    ];
+
+    for vine in &state.vines {
+        let x = vine.x as u16;
+        let _start_y = size.height.saturating_sub(vine.length);
+        for dy in 0..vine.length {
+            let y = size.height.saturating_sub(dy + 1);
+            if y < size.height {
+                let color_idx = (dy as usize / 5) % colors.len();
+                let char_idx = (vine.x as usize + dy as usize) % vine_chars.len();
+                let span = Span::styled(
+                    vine_chars[char_idx].to_string(),
+                    Style::default().fg(colors[color_idx]),
+                );
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(x, y, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+}
+
+fn render_moss(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(15, 20, 15)));
+    f.render_widget(bg_fill, size);
+
+    for cell in &state.moss {
+        if cell.x < size.width && cell.y < size.height {
+            let intensity = (100 + cell.age / 2).min(255) as u8;
+            let color = if cell.spreading {
+                Color::Rgb(intensity / 2, intensity, intensity / 3)
+            } else {
+                Color::Rgb(intensity / 3, intensity / 2, intensity / 4)
+            };
+            let ch = if cell.age < 20 {
+                '·'
+            } else if cell.age < 50 {
+                ':'
+            } else {
+                '▓'
+            };
+            let span = Span::styled(ch.to_string(), Style::default().fg(color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(cell.x, cell.y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_radar(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 15, 5)));
+    f.render_widget(bg_fill, size);
+
+    let center_x = size.width as f32 / 2.0;
+    let center_y = size.height as f32 / 2.0;
+    let radius = (size.width.min(size.height) as f32 / 2.5).min(15.0);
+
+    // Grid circles
+    for r in (2..radius as i32).step_by(4) {
+        for angle in (0..360).step_by(10) {
+            let rad = angle as f32 * std::f32::consts::PI / 180.0;
+            let x = center_x + rad.cos() * r as f32;
+            let y = center_y + rad.sin() * r as f32 * 0.6;
+            let px = x as u16;
+            let py = y as u16;
+            if px < size.width && py < size.height {
+                let span = Span::styled("·", Style::default().fg(Color::Rgb(50, 100, 50)));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(px, py, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+
+    // Sweep line
+    let sweep_angle = state.radar_angle;
+    for r in 0..radius as i32 {
+        let rad = sweep_angle;
+        let x = center_x + rad.cos() * r as f32;
+        let y = center_y + rad.sin() * r as f32 * 0.6;
+        let px = x as u16;
+        let py = y as u16;
+        if px < size.width && py < size.height {
+            let span = Span::styled("█", Style::default().fg(color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(px, py, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+
+    // Blips
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    if rng.gen_bool(0.05) {
+        let r = rng.gen_range(5.0..radius);
+        let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+        let x = center_x + angle.cos() * r;
+        let y = center_y + angle.sin() * r * 0.6;
+        let px = x as u16;
+        let py = y as u16;
+        if px < size.width && py < size.height {
+            let span = Span::styled("●", Style::default().fg(Color::Rgb(255, 50, 50)));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(px, py, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_binary_clock(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 10, 10)));
+    f.render_widget(bg_fill, size);
+
+    let time = state.binary_time;
+    let bits = [
+        (time >> 5) & 1,
+        (time >> 4) & 1,
+        (time >> 3) & 1,
+        (time >> 2) & 1,
+        (time >> 1) & 1,
+        time & 1,
+    ];
+
+    for (i, bit) in bits.iter().enumerate() {
+        let y = size.height / 2 + i as u16 * 2;
+        if y < size.height {
+            let color = if *bit == 1 {
+                Color::Rgb(0, 255, 0)
+            } else {
+                Color::Rgb(50, 50, 50)
+            };
+            let ch = if *bit == 1 { '●' } else { '○' };
+            let span = Span::styled(ch.to_string(), Style::default().fg(color));
+            let text = Line::from(vec![span]);
+            let paragraph = Paragraph::new(text);
+            let area = Rect::new(size.width / 2, y, 1, 1);
+            f.render_widget(paragraph, area);
+        }
+    }
+}
+
+fn render_signal(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 10, 15)));
+    f.render_widget(bg_fill, size);
+
+    for signal in &state.signals {
+        let x = signal.x;
+        let y = signal.y;
+        let r = signal.radius as i32;
+
+        // Draw wave at this radius
+        for angle in (0..360).step_by(30) {
+            let rad = angle as f32 * std::f32::consts::PI / 180.0;
+            let px = (x as f32 + rad.cos() * r as f32) as u16;
+            let py = (y as f32 + rad.sin() * r as f32 * 0.3) as u16;
+
+            if px < size.width && py < size.height {
+                let intensity =
+                    (signal.amplitude as f32 * (1.0 - signal.radius / signal.max_radius)) as u8;
+                let color = Color::Rgb(intensity, intensity, intensity + 50);
+                let span = Span::styled("~", Style::default().fg(color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(px, py, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+
+    // Center point
+    let cx = size.width / 2;
+    let cy = size.height / 2;
+    let span = Span::styled("●", Style::default().fg(Color::Rgb(255, 255, 255)));
+    let text = Line::from(vec![span]);
+    let paragraph = Paragraph::new(text);
+    let area = Rect::new(cx, cy, 1, 1);
+    f.render_widget(paragraph, area);
+}
+
+fn render_wifi(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(15, 15, 20)));
+    f.render_widget(bg_fill, size);
+
+    let center_x = size.width as f32 / 2.0;
+    let center_y = size.height as f32 / 2.0;
+
+    for wave in &state.wifi_waves {
+        let r = wave.radius as i32;
+        let intensity = wave.intensity;
+        let color = Color::Rgb(intensity, intensity, intensity + 20);
+
+        // Draw arc
+        for angle in 200..340 {
+            let rad = angle as f32 * std::f32::consts::PI / 180.0;
+            let x = center_x + rad.cos() * r as f32;
+            let y = center_y + rad.sin() * r as f32 * 0.5;
+            let px = x as u16;
+            let py = y as u16;
+            if px < size.width && py < size.height {
+                let span = Span::styled(")", Style::default().fg(color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(px, py, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+
+    // Source
+    let span = Span::styled("●", Style::default().fg(Color::Rgb(100, 200, 255)));
+    let text = Line::from(vec![span]);
+    let paragraph = Paragraph::new(text);
+    let area = Rect::new(center_x as u16, center_y as u16, 1, 1);
+    f.render_widget(paragraph, area);
+}
+
+fn render_paint_splatter(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(240, 240, 240)));
+    f.render_widget(bg_fill, size);
+
+    for splatter in &state.splatters {
+        let x = splatter.x;
+        let y = splatter.y;
+        let color = Color::Rgb(splatter.color.0, splatter.color.1, splatter.color.2);
+        let chars = ['·', ':', '∙', '•', '◦'];
+
+        for dy in 0..splatter.size {
+            for dx in 0..splatter.size {
+                let px = x + dx as u16;
+                let py = y + dy as u16;
+                if px < size.width && py < size.height {
+                    let ch =
+                        chars[(splatter.age as usize + dx as usize + dy as usize) % chars.len()];
+                    let span = Span::styled(ch.to_string(), Style::default().fg(color));
+                    let text = Line::from(vec![span]);
+                    let paragraph = Paragraph::new(text);
+                    let area = Rect::new(px, py, 1, 1);
+                    f.render_widget(paragraph, area);
+                }
+            }
+        }
+    }
+}
+
+fn render_ink_bleed(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(245, 245, 250)));
+    f.render_widget(bg_fill, size);
+
+    for drop in &state.ink_drops {
+        let cx = drop.x as u16;
+        let cy = drop.y as u16;
+        let r = drop.radius as i32;
+
+        for dy in -r..=r {
+            for dx in -r..=r {
+                if dx * dx + dy * dy <= r * r {
+                    let px = (cx as i32 + dx) as u16;
+                    let py = (cy as i32 + dy) as u16;
+                    if px < size.width && py < size.height {
+                        let intensity = (1.0 - (dx * dx + dy * dy) as f32 / (r * r) as f32) * 255.0;
+                        let c = Color::Rgb(
+                            (drop.color.0 as f32 * intensity / 255.0) as u8,
+                            (drop.color.1 as f32 * intensity / 255.0) as u8,
+                            (drop.color.2 as f32 * intensity / 255.0) as u8,
+                        );
+                        let span = Span::styled("▒", Style::default().fg(c));
+                        let text = Line::from(vec![span]);
+                        let paragraph = Paragraph::new(text);
+                        let area = Rect::new(px, py, 1, 1);
+                        f.render_widget(paragraph, area);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn render_mosaic(f: &mut Frame, state: &AnimationState, size: Rect) {
+    for tile in &state.mosaic_tiles {
+        let x = tile.x;
+        let y = tile.y;
+        let color = if tile.changing {
+            Color::Rgb(255, 255, 255)
+        } else {
+            Color::Rgb(tile.color.0, tile.color.1, tile.color.2)
+        };
+
+        for dy in 0..4 {
+            for dx in 0..4 {
+                let px = x + dx;
+                let py = y + dy;
+                if px < size.width && py < size.height {
+                    let span = Span::styled("█", Style::default().fg(color));
+                    let text = Line::from(vec![span]);
+                    let paragraph = Paragraph::new(text);
+                    let area = Rect::new(px, py, 1, 1);
+                    f.render_widget(paragraph, area);
+                }
+            }
+        }
+    }
+}
+
+fn render_stained_glass(f: &mut Frame, state: &AnimationState, size: Rect) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(20, 20, 25)));
+    f.render_widget(bg_fill, size);
+
+    for panel in &state.glass_panels {
+        let x = panel.x;
+        let y = panel.y;
+        let w = panel.width;
+        let h = panel.height;
+
+        let hue = panel.hue as f32 / 255.0;
+        let r = ((hue * 6.0).sin() * 0.5 + 0.5) * panel.light_intensity as f32;
+        let g = ((hue * 6.0 + 2.0).sin() * 0.5 + 0.5) * panel.light_intensity as f32;
+        let b = ((hue * 6.0 + 4.0).sin() * 0.5 + 0.5) * panel.light_intensity as f32;
+        let color = Color::Rgb(r as u8, g as u8, b as u8);
+
+        // Draw panel with border
+        for py in y..(y + h).min(size.height) {
+            for px in x..(x + w).min(size.width) {
+                let ch = if px == x || px == x + w - 1 || py == y || py == y + h - 1 {
+                    '│'
+                } else {
+                    '█'
+                };
+                let span = Span::styled(ch.to_string(), Style::default().fg(color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(px, py, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+}
+
+fn render_hologram(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 10, 10)));
+    f.render_widget(bg_fill, size);
+
+    // Scanline
+    let scan_y = state.hologram_line;
+    for x in 0..size.width {
+        let span = Span::styled("─", Style::default().fg(Color::Rgb(0, 255, 200)));
+        let text = Line::from(vec![span]);
+        let paragraph = Paragraph::new(text);
+        let area = Rect::new(x, scan_y, 1, 1);
+        f.render_widget(paragraph, area);
+    }
+
+    // Holographic content (flickering grid)
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    for y in (0..size.height).step_by(3) {
+        for x in (0..size.width).step_by(4) {
+            if rng.gen_bool(0.3) {
+                let intensity = rng.gen_range(50..200) as u8;
+                let c = match color {
+                    Color::Rgb(r, g, b) => Color::Rgb(
+                        (r as u16 * intensity as u16 / 255) as u8,
+                        (g as u16 * intensity as u16 / 255) as u8,
+                        (b as u16 * intensity as u16 / 255) as u8,
+                    ),
+                    _ => Color::Rgb(0, intensity, intensity),
+                };
+                let span = Span::styled("╋", Style::default().fg(c));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(x, y, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+}
+
+fn render_glitch(f: &mut Frame, state: &AnimationState, size: Rect) {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+
+    // Base background
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 10, 10)));
+    f.render_widget(bg_fill, size);
+
+    if state.glitch_timer > 5 {
+        // Glitch effect - random colored blocks
+        for _ in 0..10 {
+            let x = rng.gen_range(0..size.width);
+            let y = rng.gen_range(0..size.height);
+            let w = rng.gen_range(2..8);
+            let h = rng.gen_range(1..3);
+            let color = Color::Rgb(
+                rng.gen_range(0..255),
+                rng.gen_range(0..255),
+                rng.gen_range(0..255),
+            );
+
+            for dy in 0..h {
+                for dx in 0..w {
+                    let px = x + dx;
+                    let py = y + dy;
+                    if px < size.width && py < size.height {
+                        let span = Span::styled("█", Style::default().fg(color));
+                        let text = Line::from(vec![span]);
+                        let paragraph = Paragraph::new(text);
+                        let area = Rect::new(px, py, 1, 1);
+                        f.render_widget(paragraph, area);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn render_old_film(f: &mut Frame, state: &AnimationState, size: Rect) {
+    // Sepia background
+    for y in 0..size.height {
+        let sepia = Color::Rgb(120, 100, 70);
+        let spans: Vec<Span> = (0..size.width)
+            .map(|_| Span::styled("█", Style::default().fg(sepia)))
+            .collect();
+        let text = Line::from(spans);
+        let paragraph = Paragraph::new(text);
+        let area = Rect::new(0, y, size.width, 1);
+        f.render_widget(paragraph, area);
+    }
+
+    // Scratches
+    for scratch in &state.scratches {
+        if scratch.visible {
+            for i in 0..scratch.length {
+                let y = (scratch.y + i as u16) % size.height;
+                let span = Span::styled("│", Style::default().fg(Color::Rgb(200, 190, 170)));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(scratch.x, y, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
+
+    // Film grain
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    for _ in 0..50 {
+        let x = rng.gen_range(0..size.width);
+        let y = rng.gen_range(0..size.height);
+        let intensity = rng.gen_range(150..200) as u8;
+        let span = Span::styled(
+            "·",
+            Style::default().fg(Color::Rgb(intensity, intensity - 20, intensity - 50)),
+        );
+        let text = Line::from(vec![span]);
+        let paragraph = Paragraph::new(text);
+        let area = Rect::new(x, y, 1, 1);
+        f.render_widget(paragraph, area);
+    }
+}
+
+fn render_thermal(f: &mut Frame, state: &AnimationState, size: Rect) {
+    for y in 0..size.height {
+        for x in 0..size.width {
+            let idx = (y * size.width + x) as usize;
+            if let Some(noise) = state.thermal_noise.get(idx) {
+                let temp = *noise as f32 / 255.0;
+                // Thermal color mapping: black -> blue -> purple -> red -> yellow -> white
+                let color = if temp < 0.2 {
+                    Color::Rgb(0, 0, (temp * 5.0 * 255.0) as u8)
+                } else if temp < 0.4 {
+                    Color::Rgb(((temp - 0.2) * 5.0 * 255.0) as u8, 0, 255)
+                } else if temp < 0.6 {
+                    Color::Rgb(255, 0, (255.0 - (temp - 0.4) * 5.0 * 255.0) as u8)
+                } else if temp < 0.8 {
+                    Color::Rgb(255, ((temp - 0.6) * 5.0 * 255.0) as u8, 0)
+                } else {
+                    let c = ((temp - 0.8) * 5.0 * 255.0) as u8;
+                    Color::Rgb(255, 255, c)
+                };
+
+                let chars = [' ', '░', '▒', '▓', '█'];
+                let ch = chars[(temp * (chars.len() - 1) as f32) as usize];
+                let span = Span::styled(ch.to_string(), Style::default().fg(color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(x, y, 1, 1);
+                f.render_widget(paragraph, area);
+            }
+        }
+    }
 }
 
 // Matrix characters for the animation
@@ -3605,6 +6114,42 @@ fn render_background_animation(f: &mut Frame, app: &App, size: Rect) {
         "perlin_flow" => render_perlin_flow(f, &app.animation_state, size, animation_color),
         "cube_3d" => render_cube_3d(f, &app.animation_state, size, animation_color),
         "fractals" => render_fractals(f, &app.animation_state, size, animation_color),
+        // New animations v1.1.5
+        "ocean" => render_ocean(f, &app.animation_state, size),
+        "ripple" => render_ripple(f, &app.animation_state, size, animation_color),
+        "fog" => render_fog(f, &app.animation_state, size),
+        "flames" => render_flames(f, &app.animation_state, size),
+        "sparks" => render_sparks(f, &app.animation_state, size),
+        "lava_lamp" => render_lava_lamp(f, &app.animation_state, size),
+        "sun" => render_sun(f, &app.animation_state, size),
+        "galaxy" => render_galaxy(f, &app.animation_state, size),
+        "meteor_shower" => render_meteor_shower(f, &app.animation_state, size),
+        "satellite" => render_satellite(f, &app.animation_state, size),
+        "pulsar" => render_pulsar(f, &app.animation_state, size, animation_color),
+        "pong" => render_pong(f, &app.animation_state, size),
+        "snake" => render_snake(f, &app.animation_state, size),
+        "tetris" => render_tetris(f, &app.animation_state, size),
+        "invaders" => render_invaders(f, &app.animation_state, size),
+        "fibonacci" => render_fibonacci(f, &app.animation_state, size, animation_color),
+        "mandelbrot" => render_mandelbrot(f, &app.animation_state, size, animation_color),
+        "hex_grid" => render_hex_grid(f, &app.animation_state, size),
+        "rose" => render_rose(f, &app.animation_state, size, animation_color),
+        "butterflies" => render_butterflies(f, &app.animation_state, size),
+        "spider_web" => render_spider_web(f, &app.animation_state, size),
+        "vine_growth" => render_vine_growth(f, &app.animation_state, size),
+        "moss" => render_moss(f, &app.animation_state, size),
+        "radar" => render_radar(f, &app.animation_state, size, animation_color),
+        "binary_clock" => render_binary_clock(f, &app.animation_state, size),
+        "signal" => render_signal(f, &app.animation_state, size),
+        "wifi" => render_wifi(f, &app.animation_state, size),
+        "paint_splatter" => render_paint_splatter(f, &app.animation_state, size),
+        "ink_bleed" => render_ink_bleed(f, &app.animation_state, size),
+        "mosaic" => render_mosaic(f, &app.animation_state, size),
+        "stained_glass" => render_stained_glass(f, &app.animation_state, size),
+        "hologram" => render_hologram(f, &app.animation_state, size, animation_color),
+        "glitch" => render_glitch(f, &app.animation_state, size),
+        "old_film" => render_old_film(f, &app.animation_state, size),
+        "thermal" => render_thermal(f, &app.animation_state, size),
         _ => {}
     }
 }
@@ -5330,7 +7875,7 @@ fn render_help_text(f: &mut Frame, app: &App, size: Rect) {
 #[derive(Parser)]
 #[command(name = "rexit")]
 #[command(author = "Ninso112")]
-#[command(version = "1.0.0")]
+#[command(version = "1.1.5")]
 #[command(about = "A rice-ready TUI power menu for Linux with multi-WM support", long_about = None)]
 struct Cli {
     /// Generate default configuration file

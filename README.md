@@ -152,6 +152,8 @@ Set the layout mode in your config:
 layout_mode = "grid"  # Options: "vertical", "horizontal", "grid", "compact"
 ```
 
+> **Version 1.1.5** adds 29 new animations bringing the total to 65! Categories include: Water & Liquids (ocean, ripple, fog), Fire & Energy (flames, sparks, lava_lamp, sun), Cosmic (galaxy, meteor_shower, satellite, pulsar), Retro Games (pong, snake, tetris, invaders), Math/Geometric (fibonacci, mandelbrot, hex_grid, rose), Nature (butterflies, spider_web, vine_growth, moss), Technical (radar, binary_clock, signal, wifi), Artistic (paint_splatter, ink_bleed, mosaic, stained_glass), and Special Effects (hologram, glitch, old_film, thermal).
+
 ### Window Manager Auto-Detection
 
 `rexit` automatically detects your window manager and sets the appropriate logout command. Supported WMs:
@@ -233,6 +235,41 @@ density = 50            # Particle density (0-100, higher = more particles)
 | `morse` | GNU/Linux copypasta in Morse code |
 | `lissajous` | Mathematical Lissajous curves |
 | `game_of_life` | Conway's Game of Life simulation |
+| `ocean` | Deep ocean waves with varying depths |
+| `ripple` | Expanding ripple rings from center |
+| `fog` | Rolling fog/mist effect |
+| `flames` | Licking flames rising from bottom |
+| `sparks` | Sparks flying upward like welding |
+| `lava_lamp` | Blobs floating like a lava lamp |
+| `sun` | Pulsing sun with radiating rays |
+| `galaxy` | Spiral galaxy with rotating arms |
+| `meteor_shower` | Shooting stars with trails |
+| `satellite` | Orbiting satellite with signal pulses |
+| `pulsar` | Rotating neutron star beams |
+| `pong` | Classic Pong game playing itself |
+| `snake` | Snake game with AI |
+| `tetris` | Falling Tetris pieces |
+| `invaders` | Space Invaders marching |
+| `fibonacci` | Golden spiral flower pattern |
+| `mandelbrot` | Mandelbrot set visualization |
+| `hex_grid` | Hexagonal grid wave pattern |
+| `rose` | Mathematical rose curve |
+| `butterflies` | Colorful butterflies fluttering |
+| `spider_web` | Vibrating spider web |
+| `vine_growth` | Growing vines from bottom |
+| `moss` | Spreading moss cells |
+| `radar` | Radar sweep with blips |
+| `binary_clock` | Binary clock display |
+| `signal` | Oscilloscope signal waves |
+| `wifi` | Expanding WiFi signal waves |
+| `paint_splatter` | Random paint splatters |
+| `ink_bleed` | Ink drops bleeding outward |
+| `mosaic` | Changing color mosaic tiles |
+| `stained_glass` | Colorful stained glass panels |
+| `hologram` | Sci-fi hologram with scanline |
+| `glitch` | Digital glitch artifacts |
+| `old_film` | Vintage film with scratches |
+| `thermal` | Thermal camera vision |
 | `none` | No animation (static background) |
 
 **Easter Egg 🥚:** Try entering the Konami code (↑↑↓↓←→←→BA) while `rexit` is running to activate rainbow mode for compatible animations!
