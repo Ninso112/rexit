@@ -60,6 +60,9 @@ pub struct Config {
 
     /// Window manager type: "auto", "hyprland", "sway", "i3", "bspwm", "awesome"
     pub wm_type: String,
+
+    /// Grace period configuration for critical actions
+    pub grace_period: GracePeriodConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,6 +145,18 @@ pub struct AnimationConfig {
     pub density: u8,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GracePeriodConfig {
+    /// Enable grace period for critical actions (default: true)
+    pub enabled: bool,
+    /// Duration of grace period in seconds (default: 5)
+    pub duration_secs: u64,
+    /// Show countdown in center of screen (default: true)
+    pub show_countdown: bool,
+    /// Text shown during grace period countdown
+    pub message_template: String,
+}
+
 impl Default for Config {
     fn default() -> Self {
         let mut actions = HashMap::new();
@@ -149,7 +164,7 @@ impl Default for Config {
         actions.insert(
             "shutdown".to_string(),
             ActionConfig {
-                icon: "\u{23FB}".to_string(),
+                icon: "\u{f011}".to_string(),
                 label: "Shutdown".to_string(),
                 command: "systemctl".to_string(),
                 args: vec!["poweroff".to_string()],
@@ -163,7 +178,7 @@ impl Default for Config {
         actions.insert(
             "reboot".to_string(),
             ActionConfig {
-                icon: "\u{21BB}".to_string(),
+                icon: "\u{f021}".to_string(),
                 label: "Reboot".to_string(),
                 command: "systemctl".to_string(),
                 args: vec!["reboot".to_string()],
@@ -177,7 +192,7 @@ impl Default for Config {
         actions.insert(
             "suspend".to_string(),
             ActionConfig {
-                icon: "\u{23FE}".to_string(),
+                icon: "\u{f186}".to_string(),
                 label: "Suspend".to_string(),
                 command: "systemctl".to_string(),
                 args: vec!["suspend".to_string()],
@@ -191,7 +206,7 @@ impl Default for Config {
         actions.insert(
             "lock".to_string(),
             ActionConfig {
-                icon: "\u{1F512}".to_string(),
+                icon: "\u{f023}".to_string(),
                 label: "Lock".to_string(),
                 command: "hyprlock".to_string(),
                 args: vec![],
@@ -205,7 +220,7 @@ impl Default for Config {
         actions.insert(
             "logout".to_string(),
             ActionConfig {
-                icon: "\u{21E5}".to_string(),
+                icon: "\u{f08b}".to_string(),
                 label: "Logout".to_string(),
                 command: "hyprctl".to_string(),
                 args: vec!["dispatch".to_string(), "exit".to_string()],
@@ -219,7 +234,7 @@ impl Default for Config {
         actions.insert(
             "cancel".to_string(),
             ActionConfig {
-                icon: "\u{2715}".to_string(),
+                icon: "\u{f00d}".to_string(),
                 label: "Cancel".to_string(),
                 command: "".to_string(),
                 args: vec![],
@@ -287,6 +302,13 @@ impl Default for Config {
             },
             layout_mode: "vertical".to_string(),
             wm_type: "auto".to_string(),
+            grace_period: GracePeriodConfig {
+                enabled: true,
+                duration_secs: 5,
+                show_countdown: true,
+                message_template: "⏱️  {action} in {seconds}s... Press any key to cancel"
+                    .to_string(),
+            },
         }
     }
 }
@@ -453,7 +475,7 @@ select = ["Enter"]
 quit = ["Esc", "q"]
 
 [actions.shutdown]
-icon = "\u{23FB}"
+icon = "\u{f011}"  # nf-fa-power_off
 label = "Shutdown"
 command = "systemctl"
 args = ["poweroff"]
@@ -463,7 +485,7 @@ favorite = true     ## Show at top of list
 shortcut = "s"      ## Press s to select
 
 [actions.reboot]
-icon = "\u{21BB}"
+icon = "\u{f021}"  # nf-fa-refresh
 label = "Reboot"
 command = "systemctl"
 args = ["reboot"]
@@ -473,7 +495,7 @@ favorite = true
 shortcut = "r"
 
 [actions.suspend]
-icon = "\u{23FE}"
+icon = "\u{f186}"  # nf-fa-moon_o
 label = "Suspend"
 command = "systemctl"
 args = ["suspend"]
@@ -483,7 +505,7 @@ favorite = false
 shortcut = "u"
 
 [actions.lock]
-icon = "\u{1F512}"
+icon = "\u{f023}"  # nf-fa-lock
 label = "Lock"
 command = "hyprlock"
 args = []
@@ -493,7 +515,7 @@ favorite = false
 shortcut = "l"
 
 [actions.logout]
-icon = "\u{21E5}"
+icon = "\u{f08b}"
 label = "Logout"
 command = "hyprctl"
 args = ["dispatch", "exit"]
@@ -503,7 +525,7 @@ favorite = false
 shortcut = "o"
 
 [actions.cancel]
-icon = "\u{2715}"
+icon = "\u{f00d}"
 label = "Cancel"
 command = ""
 args = []
@@ -539,6 +561,14 @@ animation_type = "matrix"
 speed_ms = 80
 color = "green"
 density = 50
+
+[grace_period]
+## Grace period configuration for critical actions (shutdown, reboot)
+## Allows canceling the action during the countdown
+enabled = true
+duration_secs = 5
+show_countdown = true
+message_template = "⏱️  {action} in {seconds}s... Press any key to cancel"
 "##,
     )
 }
@@ -684,7 +714,14 @@ impl Action {
 
 enum AppState {
     Selecting,
-    Confirming { action_index: usize },
+    Confirming {
+        action_index: usize,
+    },
+    GracePeriod {
+        action_index: usize,
+        remaining_secs: u64,
+        last_tick: std::time::Instant,
+    },
     AnimationMenu,
 }
 
@@ -706,6 +743,7 @@ struct App {
     last_executed: Option<String>, // label of last executed action
     easter_egg: EasterEggState,
     animation_menu_index: usize,
+    grace_period_cancelled: bool, // Track if grace period was cancelled
 }
 
 const ANIMATION_TYPES: &[&str; 36] = &[
@@ -1094,6 +1132,7 @@ impl App {
             last_executed,
             easter_egg: EasterEggState::new(),
             animation_menu_index: 0,
+            grace_period_cancelled: false,
         };
 
         // Initialize animation based on terminal size
@@ -1164,6 +1203,22 @@ impl App {
                 return Ok(());
             }
 
+            // Check if grace period is enabled for critical actions
+            let needs_grace = self.config.grace_period.enabled
+                && action.is_critical()
+                && self.config.grace_period.duration_secs > 0;
+
+            if needs_grace && !matches!(self.state, AppState::GracePeriod { .. }) {
+                // Enter grace period mode
+                self.state = AppState::GracePeriod {
+                    action_index: self.selected_index,
+                    remaining_secs: self.config.grace_period.duration_secs,
+                    last_tick: std::time::Instant::now(),
+                };
+                self.grace_period_cancelled = false;
+                return Ok(());
+            }
+
             action.execute()?;
             self.last_executed = Some(action.label.clone());
             save_last_executed(&action.label);
@@ -1183,7 +1238,23 @@ impl App {
 
     fn confirm_yes(&mut self) -> Result<()> {
         if let AppState::Confirming { action_index } = self.state {
+            // Check if grace period is enabled for critical actions
             if let Some(action) = self.actions.get(action_index) {
+                let needs_grace = self.config.grace_period.enabled
+                    && action.is_critical()
+                    && self.config.grace_period.duration_secs > 0;
+
+                if needs_grace {
+                    // Enter grace period mode instead of executing immediately
+                    self.state = AppState::GracePeriod {
+                        action_index,
+                        remaining_secs: self.config.grace_period.duration_secs,
+                        last_tick: std::time::Instant::now(),
+                    };
+                    self.grace_period_cancelled = false;
+                    return Ok(());
+                }
+
                 action.execute()?;
                 self.last_executed = Some(action.label.clone());
                 save_last_executed(&action.label);
@@ -1195,6 +1266,45 @@ impl App {
 
     fn confirm_no(&mut self) {
         self.state = AppState::Selecting;
+    }
+
+    fn cancel_grace_period(&mut self) {
+        self.grace_period_cancelled = true;
+        self.state = AppState::Selecting;
+    }
+
+    fn update_grace_period(&mut self) -> Result<bool> {
+        if let AppState::GracePeriod {
+            action_index,
+            remaining_secs,
+            last_tick,
+        } = self.state
+        {
+            let now = std::time::Instant::now();
+            let elapsed = now.duration_since(last_tick).as_secs();
+
+            if elapsed >= 1 {
+                let new_remaining = remaining_secs.saturating_sub(elapsed);
+                if new_remaining == 0 {
+                    // Grace period expired, execute the action
+                    if let Some(action) = self.actions.get(action_index) {
+                        action.execute()?;
+                        self.last_executed = Some(action.label.clone());
+                        save_last_executed(&action.label);
+                    }
+                    self.should_quit = true;
+                    return Ok(true);
+                } else {
+                    // Update remaining time
+                    self.state = AppState::GracePeriod {
+                        action_index,
+                        remaining_secs: new_remaining,
+                        last_tick: now,
+                    };
+                }
+            }
+        }
+        Ok(false)
     }
 
     fn quit(&mut self) {
@@ -2736,6 +2846,13 @@ fn ui(f: &mut Frame, app: &mut App) {
         AppState::Confirming { action_index } => {
             render_confirmation_dialog(f, app, *action_index, size);
         }
+        AppState::GracePeriod {
+            action_index,
+            remaining_secs,
+            ..
+        } => {
+            render_grace_period(f, app, *action_index, *remaining_secs, size);
+        }
         AppState::AnimationMenu => {
             render_animation_menu(f, app, size);
         }
@@ -3180,6 +3297,131 @@ fn render_confirmation_dialog(f: &mut Frame, app: &App, action_index: usize, siz
     let help_area = Rect {
         x: inner.x,
         y: inner.y + 5,
+        width: inner.width,
+        height: 1,
+    };
+    f.render_widget(help_paragraph, help_area);
+}
+
+fn render_grace_period(
+    f: &mut Frame,
+    app: &App,
+    action_index: usize,
+    remaining_secs: u64,
+    size: Rect,
+) {
+    let config = &app.config;
+    let action = app.actions.get(action_index).unwrap();
+
+    // Parse colors
+    let fg_color = parse_color(&config.colors.foreground);
+    let border_color = parse_color(&config.colors.border);
+    let icon_color = parse_color(&config.colors.icon_color);
+
+    // Build message from template
+    let message = config
+        .grace_period
+        .message_template
+        .replace("{action}", &action.label)
+        .replace("{seconds}", &remaining_secs.to_string());
+
+    // Calculate dialog size
+    let width = (message.len() as u16 + 10).max(40).min(size.width - 4);
+    let height = 9u16;
+
+    let x = (size.width.saturating_sub(width)) / 2;
+    let y = (size.height.saturating_sub(height)) / 2;
+
+    let dialog_area = Rect {
+        x,
+        y,
+        width,
+        height,
+    };
+
+    // Clear background under dialog
+    let clear = Block::default().style(Style::default().bg(parse_color("black")));
+    f.render_widget(clear, dialog_area);
+
+    // Create dialog border
+    let border_type = match config.border.style.as_str() {
+        "rounded" => Borders::ALL,
+        _ => Borders::ALL,
+    };
+
+    let block = Block::default()
+        .borders(border_type)
+        .title(" Grace Period ")
+        .title_alignment(Alignment::Center)
+        .border_style(Style::default().fg(border_color));
+
+    let inner = block.inner(dialog_area);
+    f.render_widget(block, dialog_area);
+
+    // Render icon
+    let icon_text = format!("{} ", action.icon);
+    let icon_paragraph = Paragraph::new(icon_text)
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(icon_color));
+    let icon_area = Rect {
+        x: inner.x,
+        y: inner.y + 1,
+        width: inner.width,
+        height: 1,
+    };
+    f.render_widget(icon_paragraph, icon_area);
+
+    // Render message
+    let message_paragraph = Paragraph::new(message.clone())
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(fg_color).add_modifier(Modifier::BOLD));
+    let message_area = Rect {
+        x: inner.x,
+        y: inner.y + 3,
+        width: inner.width,
+        height: 1,
+    };
+    f.render_widget(message_paragraph, message_area);
+
+    // Render countdown bar
+    let total_secs = config.grace_period.duration_secs as f64;
+    let progress = remaining_secs as f64 / total_secs;
+    let bar_width = inner.width.saturating_sub(4) as usize;
+    let filled = (bar_width as f64 * progress) as usize;
+    let empty = bar_width.saturating_sub(filled);
+
+    let filled_char = "█";
+    let empty_char = "░";
+
+    let bar = format!("{}{}", filled_char.repeat(filled), empty_char.repeat(empty));
+
+    let bar_color = if progress > 0.6 {
+        Color::Green
+    } else if progress > 0.3 {
+        Color::Yellow
+    } else {
+        Color::Red
+    };
+
+    let bar_paragraph = Paragraph::new(bar)
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(bar_color));
+    let bar_area = Rect {
+        x: inner.x + 2,
+        y: inner.y + 5,
+        width: inner.width.saturating_sub(4),
+        height: 1,
+    };
+    f.render_widget(bar_paragraph, bar_area);
+
+    // Render help text
+    let help_text = "Press any key to cancel";
+    let help_paragraph = Paragraph::new(help_text)
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(parse_color("gray")));
+    let help_area = Rect {
+        x: inner.x,
+        y: inner.y + 7,
         width: inner.width,
         height: 1,
     };
@@ -5188,6 +5430,13 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
             break;
         }
 
+        // Update grace period countdown
+        if matches!(app.state, AppState::GracePeriod { .. }) {
+            if app.update_grace_period()? {
+                break; // Grace period expired and action executed
+            }
+        }
+
         if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
@@ -5195,6 +5444,9 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
                     match &app.state {
                         AppState::Confirming { .. } => {
                             handle_confirmation_input(app, &key)?;
+                        }
+                        AppState::GracePeriod { .. } => {
+                            handle_grace_period_input(app, &key)?;
                         }
                         AppState::AnimationMenu => {
                             handle_animation_menu_input(app, &key)?;
@@ -5254,6 +5506,12 @@ fn handle_confirmation_input(app: &mut App, key: &crossterm::event::KeyEvent) ->
         }
         _ => {}
     }
+    Ok(())
+}
+
+fn handle_grace_period_input(app: &mut App, _key: &crossterm::event::KeyEvent) -> Result<()> {
+    // Any key press cancels the grace period
+    app.cancel_grace_period();
     Ok(())
 }
 

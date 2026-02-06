@@ -24,6 +24,8 @@ A **rice-ready** TUI (Text User Interface) power menu for Linux, supporting mult
 - ⚡ **Zero Configuration** - Works out of the box
 - 🎨 **Fully Riceable** - Customize everything: colors, icons, text, keybindings, layout
 - ✨ **Background Animations** - Matrix rain, thunderstorm, snow, stars, fireflies, bubbles, confetti, waves, and particles
+- ⏱️ **Grace Period** - Cancel critical actions (shutdown/reboot) during a configurable countdown
+- 🔣 **Nerd Font Icons** - Beautiful icons for all actions (requires Nerd Fonts)
 - 🥚 **Easter Eggs** - Hidden surprises like the Konami code (try it!)
 
 ## Installation
@@ -311,42 +313,42 @@ enabled = true
 
 ```toml
 [actions.shutdown]
-icon = "⏻"
+icon = ""           # Nerd Font: nf-fa-power_off
 label = "Shutdown"
 command = "systemctl"
 args = ["poweroff"]
 enabled = true
 
 [actions.reboot]
-icon = "↻"
+icon = ""           # Nerd Font: nf-fa-refresh
 label = "Reboot"
 command = "systemctl"
 args = ["reboot"]
 enabled = true
 
 [actions.suspend]
-icon = "⏾"
+icon = ""           # Nerd Font: nf-fa-moon_o
 label = "Suspend"
 command = "systemctl"
 args = ["suspend"]
 enabled = true
 
 [actions.lock]
-icon = "🔒"
+icon = ""           # Nerd Font: nf-fa-lock
 label = "Lock"
 command = "hyprlock"
 args = []
 enabled = true
 
 [actions.logout]
-icon = "⇥"
+icon = ""           # Nerd Font: nf-fa-sign_out
 label = "Logout"
 command = "hyprctl"
 args = ["dispatch", "exit"]
 enabled = true
 
 [actions.cancel]
-icon = "✕"
+icon = ""           # Nerd Font: nf-fa-close
 label = "Cancel"
 command = ""  # Empty command just exits
 args = []
@@ -361,6 +363,21 @@ enabled = true
 template = "{keys} {action} | "
 separator = " | "
 ```
+
+#### Grace Period
+
+Configure the countdown period for critical actions (shutdown, reboot):
+
+```toml
+[grace_period]
+enabled = true                    # Enable grace period for critical actions
+duration_secs = 5                 # Countdown duration in seconds
+show_countdown = true             # Show visual countdown bar
+message_template = "⏱️  {action} in {seconds}s... Press any key to cancel"
+```
+
+When enabled, critical actions like shutdown and reboot will show a countdown
+during which you can press any key to cancel the action.
 
 #### Layout
 
