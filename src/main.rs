@@ -708,7 +708,7 @@ struct App {
     animation_menu_index: usize,
 }
 
-const ANIMATION_TYPES: &[&str] = &[
+const ANIMATION_TYPES: &[&str; 30] = &[
     "matrix",
     "rain",
     "thunder",
@@ -2130,16 +2130,14 @@ impl AnimationState {
     }
 
     fn update_typing_code(&mut self) {
-        // Type one character every few ticks
-        if self.tick.is_multiple_of(3) {
-            if let Some(line) = self.code_lines.get(self.code_line_idx) {
-                if self.code_char_idx < line.len() {
-                    self.code_char_idx += 1;
-                } else {
-                    // Move to next line
-                    self.code_line_idx = (self.code_line_idx + 1) % self.code_lines.len();
-                    self.code_char_idx = 0;
-                }
+        // Type one character every tick for faster animation
+        if let Some(line) = self.code_lines.get(self.code_line_idx) {
+            if self.code_char_idx < line.len() {
+                self.code_char_idx += 1;
+            } else {
+                // Move to next line
+                self.code_line_idx = (self.code_line_idx + 1) % self.code_lines.len();
+                self.code_char_idx = 0;
             }
         }
     }
@@ -2509,7 +2507,7 @@ impl AnimationState {
 }
 
 // Matrix characters for the animation
-const MATRIX_CHARS: &[char] = &[
+const MATRIX_CHARS: &[char; 49] = &[
     'ｱ', 'ｲ', 'ｳ', 'ｴ', 'ｵ', 'ｶ', 'ｷ', 'ｸ', 'ｹ', 'ｺ', 'ｻ', 'ｼ', 'ｽ', 'ｾ', 'ｿ', 'ﾀ', 'ﾁ', 'ﾂ', 'ﾃ',
     'ﾄ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'H', 'E', 'M', 'A', 'T', 'R', 'I',
     'X', 'ﾊ', 'ﾋ', 'ﾌ', 'ﾍ', 'ﾎ', 'ﾏ', 'ﾐ', 'ﾑ', 'ﾒ', 'ﾓ',
@@ -3666,20 +3664,23 @@ fn render_plasma(f: &mut Frame, state: &AnimationState, size: Rect) {
 
 fn render_scanlines(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
     // Dark background
-    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 10, 10)));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(5, 5, 5)));
     f.render_widget(bg_fill, size);
 
-    // Render scanlines
+    // Render scanlines - fill entire lines
     for y in 0..size.height {
-        let is_scanline = y % 4 == state.scanline_pos % 4;
+        let is_scanline = (y + state.scanline_pos) % 4 == 0;
         let line_color = if is_scanline {
             color
         } else {
-            Color::Rgb(20, 20, 20)
+            Color::Rgb(15, 15, 15)
         };
 
-        let span = Span::styled("░", Style::default().fg(line_color));
-        let text = Line::from(vec![span]);
+        // Create a full-width span with spaces for background color
+        let line_spans: Vec<Span> = (0..size.width)
+            .map(|_| Span::styled("█", Style::default().fg(line_color)))
+            .collect();
+        let text = Line::from(line_spans);
         let paragraph = Paragraph::new(text);
         let area = Rect::new(0, y, size.width, 1);
         f.render_widget(paragraph, area);
@@ -3688,10 +3689,17 @@ fn render_scanlines(f: &mut Frame, state: &AnimationState, size: Rect, color: Co
     // Occasional glitch effect
     use rand::Rng;
     let mut rng = rand::thread_rng();
-    if rng.gen_bool(0.05) {
+    if rng.gen_bool(0.02) {
         let glitch_y = rng.gen_range(0..size.height);
-        let glitch_span = Span::styled("█", Style::default().fg(Color::White));
-        let glitch_text = Line::from(vec![glitch_span]);
+        let glitch_color = Color::Rgb(
+            rng.gen_range(100..255),
+            rng.gen_range(100..255),
+            rng.gen_range(100..255),
+        );
+        let glitch_spans: Vec<Span> = (0..size.width)
+            .map(|_| Span::styled("░", Style::default().fg(glitch_color)))
+            .collect();
+        let glitch_text = Line::from(glitch_spans);
         let glitch_paragraph = Paragraph::new(glitch_text);
         let glitch_area = Rect::new(0, glitch_y, size.width, 1);
         f.render_widget(glitch_paragraph, glitch_area);
@@ -3768,113 +3776,192 @@ fn render_dna(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
     let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
     f.render_widget(bg_fill, size);
 
-    let center_x = size.width / 2;
+    // Define multiple helix center positions based on terminal width
+    let num_helixes = ((size.width as usize) / 25).max(1).min(4);
+    let spacing = size.width / (num_helixes as u16 + 1);
 
-    for base in &state.dna {
-        let y = base.y as u16;
-        if y >= size.height {
-            continue;
-        }
+    for helix_idx in 0..num_helixes {
+        let center_x = spacing * (helix_idx as u16 + 1);
+        let phase_offset = helix_idx as f32 * 1.5; // Offset phase for visual variety
 
-        // Calculate helix offset
-        let phase = base.y * 0.3;
-        let offset = (phase.sin() * 8.0) as i16;
-
-        let left_x = (center_x as i16 - 5 + offset).max(0) as u16;
-        let right_x = (center_x as i16 + 5 + offset).max(0) as u16;
-
-        if left_x < size.width {
-            let span = Span::styled(
-                base.left_char.to_string(),
-                Style::default().fg(Color::Rgb(0, 200, 100)),
-            );
-            let text = Line::from(vec![span]);
-            let paragraph = Paragraph::new(text);
-            let area = Rect::new(left_x, y, 1, 1);
-            f.render_widget(paragraph, area);
-        }
-
-        if right_x < size.width && base.connection {
-            // Draw connection
-            for cx in left_x..=right_x {
-                if cx < size.width {
-                    let span = Span::styled("─", Style::default().fg(color));
-                    let text = Line::from(vec![span]);
-                    let paragraph = Paragraph::new(text);
-                    let area = Rect::new(cx, y, 1, 1);
-                    f.render_widget(paragraph, area);
-                }
+        for base in &state.dna {
+            let y = base.y as u16;
+            if y >= size.height {
+                continue;
             }
 
-            if right_x < size.width {
-                let span = Span::styled(
-                    base.right_char.to_string(),
-                    Style::default().fg(Color::Rgb(200, 100, 0)),
-                );
+            // Calculate helix offset - double helix with phase offset
+            let phase1 = base.y * 0.3 + phase_offset;
+            let phase2 = phase1 + std::f32::consts::PI; // 180 degree offset for second strand
+
+            let offset1 = (phase1.sin() * 5.0) as i16;
+            let offset2 = (phase2.sin() * 5.0) as i16;
+
+            let strand1_x = (center_x as i16 + offset1).max(0) as u16;
+            let strand2_x = (center_x as i16 + offset2).max(0) as u16;
+
+            // Alternate colors for different helixes
+            let hue_shift = (helix_idx * 60) as u8;
+            let color1 = Color::Rgb(
+                0u8,
+                255u8.saturating_sub(hue_shift),
+                100u8.saturating_add(hue_shift),
+            );
+            let color2 = Color::Rgb(
+                255u8.saturating_sub(hue_shift),
+                150u8.saturating_sub(hue_shift / 2),
+                hue_shift,
+            );
+
+            // Draw first strand
+            if strand1_x < size.width {
+                let span = Span::styled(base.left_char.to_string(), Style::default().fg(color1));
                 let text = Line::from(vec![span]);
                 let paragraph = Paragraph::new(text);
-                let area = Rect::new(right_x, y, 1, 1);
+                let area = Rect::new(strand1_x, y, 1, 1);
                 f.render_widget(paragraph, area);
+            }
+
+            // Draw second strand and connection
+            if strand2_x < size.width {
+                // Draw connection between strands if they connect
+                if base.connection {
+                    let min_x = strand1_x.min(strand2_x);
+                    let max_x = strand1_x.max(strand2_x);
+
+                    for cx in min_x..=max_x {
+                        if cx < size.width {
+                            let ch = if cx == strand1_x || cx == strand2_x {
+                                "●" // Base marker
+                            } else {
+                                "=" // Hydrogen bond connection
+                            };
+                            let span = Span::styled(ch, Style::default().fg(color));
+                            let text = Line::from(vec![span]);
+                            let paragraph = Paragraph::new(text);
+                            let area = Rect::new(cx, y, 1, 1);
+                            f.render_widget(paragraph, area);
+                        }
+                    }
+                }
+
+                // Draw second strand base
+                if strand2_x < size.width {
+                    let span =
+                        Span::styled(base.right_char.to_string(), Style::default().fg(color2));
+                    let text = Line::from(vec![span]);
+                    let paragraph = Paragraph::new(text);
+                    let area = Rect::new(strand2_x, y, 1, 1);
+                    f.render_widget(paragraph, area);
+                }
             }
         }
     }
 }
 
-fn render_synthwave(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
+fn render_synthwave(f: &mut Frame, state: &AnimationState, size: Rect, _color: Color) {
     let bg_fill = Block::default().style(Style::default().bg(Color::Rgb(10, 0, 20)));
     f.render_widget(bg_fill, size);
 
-    // Draw sun
+    // Draw sunset gradient background
+    for y in 0..(size.height / 2) {
+        let intensity = (y as f32 / (size.height / 2) as f32 * 100.0) as u8;
+        let sunset_color = Color::Rgb(150 + intensity, 50, 100 + intensity / 2);
+        let spans: Vec<Span> = (0..size.width)
+            .map(|_| Span::styled("█", Style::default().fg(sunset_color)))
+            .collect();
+        let text = Line::from(spans);
+        let paragraph = Paragraph::new(text);
+        let area = Rect::new(0, y, size.width, 1);
+        f.render_widget(paragraph, area);
+    }
+
+    // Draw sun with horizontal stripes (synthwave style)
     let sun_y = size.height / 3;
-    let sun_radius = 6;
-    for y in 0..sun_radius {
-        let sun_row_y = sun_y + y as u16;
-        if sun_row_y < size.height {
-            let line_width = (sun_radius - y) * 2;
-            let start_x = (size.width / 2).saturating_sub(line_width as u16);
-            for x in 0..(line_width as u16 * 2) {
-                let px = start_x + x;
-                if px < size.width {
-                    let span = Span::styled("█", Style::default().fg(Color::Rgb(255, 100, 100)));
-                    let text = Line::from(vec![span]);
-                    let paragraph = Paragraph::new(text);
-                    let area = Rect::new(px, sun_row_y, 1, 1);
-                    f.render_widget(paragraph, area);
-                }
+    let sun_radius = (size.height / 6).min(12) as i16;
+    for y_offset in -sun_radius..=0 {
+        let sun_row_y = (sun_y as i16 + y_offset) as u16;
+        if sun_row_y >= size.height / 2 {
+            continue;
+        }
+        // Calculate width of sun at this height
+        let width_at_height =
+            ((sun_radius * sun_radius - y_offset * y_offset) as f32).sqrt() as i16;
+        let start_x = (size.width / 2).saturating_sub(width_at_height as u16);
+        let end_x = (size.width / 2 + width_at_height as u16).min(size.width);
+
+        for px in start_x..end_x {
+            if px < size.width {
+                // Cut out horizontal lines for synthwave sun effect
+                let stripe_pattern = (sun_row_y as i16 + state.synthwave_offset as i16) % 3 == 0;
+                let sun_color = if stripe_pattern {
+                    Color::Rgb(255, 50, 100) // Darker stripe
+                } else {
+                    Color::Rgb(255, 200, 100) // Bright sun
+                };
+                let span = Span::styled("█", Style::default().fg(sun_color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(px, sun_row_y, 1, 1);
+                f.render_widget(paragraph, area);
             }
         }
     }
 
-    // Draw grid lines
-    let offset = state.synthwave_offset as u16 % 4;
-    for y in (sun_y + sun_radius as u16..size.height).step_by(4) {
-        let grid_y = y + offset;
-        if grid_y < size.height {
-            let span = Span::styled("─", Style::default().fg(color));
-            let text = Line::from(vec![span]);
+    // Draw horizon line
+    let horizon_y = size.height / 2;
+    let horizon_spans: Vec<Span> = (0..size.width)
+        .map(|_| Span::styled("▄", Style::default().fg(Color::Rgb(255, 100, 200))))
+        .collect();
+    let horizon_text = Line::from(horizon_spans);
+    let horizon_paragraph = Paragraph::new(horizon_text);
+    let horizon_area = Rect::new(0, horizon_y, size.width, 1);
+    f.render_widget(horizon_paragraph, horizon_area);
+
+    // Draw perspective grid
+    let offset = (state.synthwave_offset as u16) % 4;
+    let grid_start = horizon_y + 1;
+
+    // Horizontal grid lines with perspective
+    for y in (grid_start..size.height).step_by(2) {
+        let distance = (y - grid_start) as f32;
+        let perspective_gap = (1.0 + distance * 0.1) as u16;
+        if (y + offset) % perspective_gap == 0 {
+            let line_color = Color::Rgb(
+                100 + (distance * 2.0) as u8,
+                0,
+                150 + (distance * 2.0) as u8,
+            );
+            let spans: Vec<Span> = (0..size.width)
+                .map(|_| Span::styled("─", Style::default().fg(line_color)))
+                .collect();
+            let text = Line::from(spans);
             let paragraph = Paragraph::new(text);
-            let area = Rect::new(0, grid_y, size.width, 1);
+            let area = Rect::new(0, y, size.width, 1);
             f.render_widget(paragraph, area);
         }
     }
 
-    // Vertical perspective lines
+    // Vertical perspective lines radiating from center
     let center_x = size.width / 2;
-    for i in 0..10 {
-        let x = if i < 5 {
-            center_x.saturating_sub((5 - i) as u16 * 4)
-        } else {
-            center_x + ((i - 5) as u16 * 4)
-        };
-        if x < size.width {
-            for y in sun_y + sun_radius as u16..size.height {
-                if (y + offset).is_multiple_of(4) {
-                    let span = Span::styled("│", Style::default().fg(color));
-                    let text = Line::from(vec![span]);
-                    let paragraph = Paragraph::new(text);
-                    let area = Rect::new(x, y, 1, 1);
-                    f.render_widget(paragraph, area);
-                }
+    let num_vertical_lines = 9;
+    for i in 0..num_vertical_lines {
+        let angle = (i as f32 - (num_vertical_lines as f32 / 2.0)) * 0.15;
+        for y in grid_start..size.height {
+            let progress = (y - grid_start) as f32 / (size.height - grid_start) as f32;
+            let x_offset = (angle * progress * size.width as f32) as i16;
+            let x = (center_x as i16 + x_offset).max(0) as u16;
+            if x < size.width {
+                let line_color = Color::Rgb(
+                    (100.0 + progress * 100.0) as u8,
+                    0,
+                    (150.0 + progress * 100.0) as u8,
+                );
+                let span = Span::styled("│", Style::default().fg(line_color));
+                let text = Line::from(vec![span]);
+                let paragraph = Paragraph::new(text);
+                let area = Rect::new(x, y, 1, 1);
+                f.render_widget(paragraph, area);
             }
         }
     }
@@ -4000,7 +4087,8 @@ fn render_fish_tank(f: &mut Frame, state: &AnimationState, size: Rect) {
         let y = fish.y as u16;
         let x = fish.x as u16;
 
-        if y < size.height && x < size.width {
+        // Check bounds properly - fish is 3 characters wide
+        if y < size.height && x < size.width.saturating_sub(2) {
             let fish_char = if fish.direction { "><>" } else { "<><" };
             let color = fish_colors[fish.color as usize % fish_colors.len()];
 
