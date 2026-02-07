@@ -487,17 +487,6 @@ min_width = 30
 min_height = 10
 ```
 
-## Theme Gallery
-
-### Quick Start
-### Popular Dark Themes
-### Light Themes
-### Accessibility Themes
-### Creating Custom Themes
-### Theme Showcase
-
-### Example Rices
-
 #### Matrix Theme (Default)
 
 The default Matrix theme with green digital rain:
