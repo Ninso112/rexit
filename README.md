@@ -1,12 +1,14 @@
 # rexit
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Rust](https://img.shields.io/badge/rust-1.70%2B-blue.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-blue.svg)](https://rust-lang.org/)
 [![Hyprland](https://img.shields.io/badge/Hyprland-compatible-green.svg)](https://hyprland.org/)
 [![Sway](https://img.shields.io/badge/Sway-compatible-blue.svg)](https://swaywm.org/)
 [![i3](https://img.shields.io/badge/i3-compatible-orange.svg)](https://i3wm.org/)
 
 A **rice-ready** TUI (Text User Interface) power menu for Linux, supporting multiple window managers including Hyprland, Sway, i3, BSPWM, and AwesomeWM.
+
+Version 1.1.6
 
 ## Description
 
@@ -16,16 +18,18 @@ A **rice-ready** TUI (Text User Interface) power menu for Linux, supporting mult
 
 - 🖥️ **Clean TUI Interface** - Built with Ratatui for a beautiful terminal experience
 - ⌨️ **Keyboard Navigation** - Navigate with Arrow keys or Vim keys (j/k)
+- 🖱️ **Mouse Support** - Click and scroll support in compatible terminals
 - 🔑 **Action Shortcuts** - Each action has its own configurable shortcut (e.g., `s` for Shutdown, `r` for Reboot)
 - 🚀 **Fast & Lightweight** - Low resource usage, instant startup
 - 🎯 **Focused Functionality** - Six essential power options in one place
 - 🔒 **Multi-WM Support** - Native support for Hyprland, Sway, i3, BSPWM, and AwesomeWM with automatic detection
-- 📐 **Flexible Layouts** - Vertical, horizontal, grid, and compact layout modes
+- 📐 **Flexible Layouts** - Vertical, horizontal, grid, and compact layout modes with responsive sizing
 - ⚡ **Zero Configuration** - Works out of the box
 - 🎨 **Fully Riceable** - Customize everything: colors, icons, text, keybindings, layout
-- ✨ **Background Animations** - Matrix rain, thunderstorm, snow, stars, fireflies, bubbles, confetti, waves, and particles
+- 🎭 **Theme Support** - Load themes from files with `--theme` flag
+- ✨ **Background Animations** - 70+ animations with adaptive quality for performance
 - ⏱️ **Grace Period** - Cancel critical actions (shutdown/reboot) during a configurable countdown
-- 🔣 **Nerd Font Icons** - Beautiful icons for all actions (requires Nerd Fonts)
+- 🔣 **Nerd Font Icons** - Beautiful icons with automatic emoji fallback
 - 🥚 **Easter Eggs** - Hidden surprises like the Konami code (try it!)
 
 ## Installation
@@ -83,6 +87,18 @@ rexit --init
 
 # Use custom config file
 rexit --config /path/to/config.toml
+
+# Use a theme
+rexit --theme dracula
+
+# List available themes
+rexit --list-themes
+
+# Validate configuration
+rexit --check-config
+
+# Use emoji icons (no Nerd Fonts required)
+rexit --emoji
 ```
 
 ### Keyboard Controls (Default)
@@ -330,6 +346,27 @@ select = ["Enter"]
 quit = ["Esc", "q"]
 ```
 
+#### Responsive Layout
+
+```toml
+[responsive]
+enabled = true                    # Enable responsive layout adjustments
+compact_threshold = 80            # Switch to compact below this width
+minimal_threshold = 40            # Switch to minimal below this width
+hide_border_when_small = true     # Hide border when terminal is small
+min_terminal_width = 20           # Minimum terminal width required
+min_terminal_height = 5           # Minimum terminal height required
+```
+
+#### Performance Settings
+
+```toml
+[performance]
+auto_degrade = true               # Enable automatic quality reduction under high CPU
+target_fps = 30                   # Target frame rate (higher = smoother but more CPU)
+disable_on_low_battery = false    # Disable animations when battery is low (laptops)
+```
+
 #### Actions
 
 Each action can be customized with its own icon, label, and command:
@@ -449,6 +486,15 @@ horizontal_margin = 30   # 30% of terminal width as margin
 min_width = 30
 min_height = 10
 ```
+
+## Theme Gallery
+
+### Quick Start
+### Popular Dark Themes
+### Light Themes
+### Accessibility Themes
+### Creating Custom Themes
+### Theme Showcase
 
 ### Example Rices
 
@@ -755,6 +801,173 @@ help_key_fg = "#ffffff"
 help_key_modifier = []
 ```
 
+## 🎨 Theme Gallery
+
+rexit includes **30+ beautifully crafted themes** ready to use. Themes are stored in `~/.config/rexit/themes/` as individual `.toml` files.
+
+### Quick Start
+
+```bash
+# List all available themes
+rexit --list-themes
+
+# Try a theme
+rexit --theme catppuccin-mocha
+
+# Set a default theme in your config
+echo 'theme = "tokyo-night"' >> ~/.config/rexit/config.toml
+```
+
+---
+
+### 🌙 Popular Dark Themes
+
+**Modern & Vibrant**
+| Theme | Style | Command |
+|-------|-------|---------|
+| `catppuccin-mocha` | 🩷 Pastel pink & mauve | `rexit --theme catppuccin-mocha` |
+| `tokyo-night` | 🌃 Tokyo city lights | `rexit --theme tokyo-night` |
+| `dracula` | 🧛 Classic vibrant dark | `rexit --theme dracula` |
+| `nord` | ❄️ Arctic bluish | `rexit --theme nord` |
+| `rose-pine` | 🌲 Natural & soft | `rexit --theme rose-pine` |
+| `rose-pine-moon` | 🌙 Moonlit purple | `rexit --theme rose-pine-moon` |
+
+**Professional & Clean**
+| Theme | Style | Command |
+|-------|-------|---------|
+| `one-dark` | 💙 Atom editor style | `rexit --theme one-dark` |
+| `monokai-pro` | 💜 Professional purple | `rexit --theme monokai-pro` |
+| `material-ocean` | 🌊 Deep ocean blue | `rexit --theme material-ocean` |
+| `palenight` | 🔮 Soft purple-blue | `rexit --theme palenight` |
+| `night-owl` | 🦉 Late night coding | `rexit --theme night-owl` |
+| `poimandres` | 🌊 Soft blue-cyan | `rexit --theme poimandres` |
+
+**Retro & Synth**
+| Theme | Style | Command |
+|-------|-------|---------|
+| `gruvbox` | 📻 Retro groove (dark) | `rexit --theme gruvbox` |
+| `synthwave-84` | 🕹️ 80s neon retro | `rexit --theme synthwave-84` |
+| `outrun` | 🏎️ Racing neon | `rexit --theme outrun` |
+| `vaporwave` | 🌴 Dreamy pink | `rexit --theme vaporwave` |
+| `cyberpunk` | 🤖 Neon pink/cyan | `rexit --theme cyberpunk` |
+
+**Nature Inspired**
+| Theme | Style | Command |
+|-------|-------|---------|
+| `everforest` | 🌲 Forest greens | `rexit --theme everforest` |
+| `kanagawa` | 🗾 Japanese waves | `rexit --theme kanagawa` |
+| `terafox` | 🦊 Teal fox colors | `rexit --theme terafox` |
+| `flexoki` | 🍂 Warm muted | `rexit --theme flexoki` |
+
+**Minimalist**
+| Theme | Style | Command |
+|-------|-------|---------|
+| `zenburn` | 👁️ Easy on the eyes | `rexit --theme zenburn` |
+| `apprentice` | ⚪ Minimal gray | `rexit --theme apprentice` |
+| `midnight` | 🌑 Deep midnight | `rexit --theme midnight` |
+| `horizon` | 🌅 Warm purple-pink | `rexit --theme horizon` |
+| `city-lights` | 🌆 Cool cyan metro | `rexit --theme city-lights` |
+| `shades-of-purple` | 💜 Purple passion | `rexit --theme shades-of-purple` |
+
+**Corporate**
+| Theme | Style | Command |
+|-------|-------|---------|
+| `oxocarbon` | 🏢 IBM Carbon | `rexit --theme oxocarbon` |
+| `modus-vivendi` | ♿ Accessible dark | `rexit --theme modus-vivendi` |
+
+---
+
+### ☀️ Light Themes
+
+| Theme | Style | Command |
+|-------|-------|---------|
+| `solarized-light` | ☀️ Classic light beige | `rexit --theme solarized-light` |
+| `rose-pine-dawn` | 🌅 Soft morning pink | `rexit --theme rose-pine-dawn` |
+| `gruvbox-light` | 📻 Retro light | `rexit --theme gruvbox-light` |
+| `modus-operandi` | ♿ Accessible light | `rexit --theme modus-operandi` |
+
+---
+
+### ♿ Accessibility Themes
+
+| Theme | Purpose | Command |
+|-------|---------|---------|
+| `high-contrast` | Maximum visibility | `rexit --theme high-contrast` |
+| `solarized-dark` | Optimized readability | `rexit --theme solarized-dark` |
+
+---
+
+### 🎨 Creating Custom Themes
+
+1. Create a new theme file:
+```bash
+mkdir -p ~/.config/rexit/themes
+cat > ~/.config/rexit/themes/mytheme.toml << 'EOF'
+[colors]
+foreground = "#cdd6f4"
+background = "#1e1e2e"
+border = "#b4befe"
+selected_fg = "#1e1e2e"
+selected_bg = "#b4befe"
+selected_modifier = ["bold"]
+icon_color = "#f38ba8"
+help_fg = "#6c7086"
+help_key_fg = "#89b4fa"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+animation_type = "matrix"
+speed_ms = 80
+color = "#a6e3a1"
+density = 50
+adaptive_quality = true
+min_speed_ms = 200
+EOF
+```
+
+2. Use your theme:
+```bash
+rexit --theme mytheme
+```
+
+3. Make it permanent in `~/.config/rexit/config.toml`:
+```toml
+theme = "mytheme"
+```
+
+### 🖼️ Theme Showcase
+
+**Catppuccin Mocha** - Soft pastel perfection
+```
+┌─────────────────────────┐
+│  ⏻ [s] Shutdown         │
+│  🔄 [r] Reboot    <--   │
+│  🌙 [u] Suspend         │
+└─────────────────────────┘
+```
+
+**Tokyo Night** - City lights aesthetic
+```
+┌─────────────────────────┐
+│  ⏻ [s] Shutdown         │
+│  🔄 [r] Reboot    <--   │
+│  🌙 [u] Suspend         │
+└─────────────────────────┘
+```
+
+**Cyberpunk** - Neon future
+```
+┌─────────────────────────┐
+│  ⏻ [s] Shutdown         │
+│  🔄 [r] Reboot    <--   │
+│  🌙 [u] Suspend         │
+└─────────────────────────┘
+```
+
 ## Building
 
 ```bash
@@ -793,7 +1006,7 @@ cargo run
 | BSPWM      | -               | `bspc quit`                       |
 | AwesomeWM  | -               | `awesome-client "awesome.quit()"` |
 
-*Note: Lock commands for i3, BSPWM, and AwesomeWM should be configured in your config file as these WMs don't have a default lock utility.*
+*Note: rexit automatically detects and falls back to available lock utilities (hyprlock, swaylock, i3lock, betterlockscreen, etc.) if the default is not installed.*
 
 ## Dependencies
 

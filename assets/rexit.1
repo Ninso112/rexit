@@ -1,0 +1,266 @@
+.TH REXIT 1 "January 2025" "rexit 1.1.6" "User Commands"
+.SH NAME
+rexit \- A rice-ready TUI power menu for Linux with multi-WM support
+.SH SYNOPSIS
+.B rexit
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B rexit
+is a lightweight, terminal-based power menu designed for Linux systems.
+It provides a clean interface to quickly execute common power management
+commands with support for multiple window managers including Hyprland,
+Sway, i3, BSPWM, and AwesomeWM.
+.PP
+Features include:
+.IP \[bu] 2
+Clean TUI interface built with Ratatui
+.IP \[bu] 2
+Keyboard and mouse navigation
+.IP \[bu] 2
+Background animations with performance monitoring
+.IP \[bu] 2
+Theme support with customizable colors
+.IP \[bu] 2
+Responsive layout adapting to terminal size
+.IP \[bu] 2
+Emoji fallback for terminals without Nerd Fonts
+.IP \[bu] 2
+Grace period for critical actions
+.SH OPTIONS
+.TP
+.BR \-i ", " \-\-init
+Generate a default configuration file at
+.BR ~/.config/rexit/config.toml
+.TP
+.BR \-c ", " \-\-config " " \fIPATH\fR
+Use a custom configuration file from the specified path
+.TP
+.BR \-t ", " \-\-theme " " \fINAME\fR
+Load a theme from
+.BR ~/.config/rexit/themes/<name>.toml
+.TP
+.BR \-\-list\-themes
+List all available themes in the themes directory
+.TP
+.BR \-\-check\-config
+Validate the configuration file and exit
+.TP
+.BR \-\-emoji
+Use emoji icons instead of Nerd Fonts
+.TP
+.BR \-h ", " \-\-help
+Print help information
+.TP
+.BR \-V ", " \-\-version
+Print version information
+.SH KEYBOARD CONTROLS
+.SS Navigation
+.TP
+.BR "Up/k"
+Move selection up
+.TP
+.BR "Down/j"
+Move selection down
+.TP
+.BR "Enter"
+Execute selected command
+.TP
+.BR "Esc/q"
+Cancel and exit
+.SS Action Shortcuts
+Each action has its own configurable shortcut key:
+.TP
+.BR s
+Shutdown
+.TP
+.BR r
+Reboot
+.TP
+.BR u
+Suspend
+.TP
+.BR l
+Lock
+.TP
+.BR o
+Logout
+.TP
+.BR c
+Cancel
+.SS Hidden Features
+.TP
+.BR a
+Open animation selector menu
+.TP
+.BR "Konami Code"
+Enter the Konami code (up up down down left right left right b a) to enable rainbow mode
+.SH MOUSE SUPPORT
+rexit supports mouse input in terminals that support it:
+.IP \[bu] 2
+Left-click on an action to select and execute it
+.IP \[bu] 2
+Scroll up/down to navigate through actions
+.IP \[bu] 2
+Click anywhere to cancel confirmation or grace period
+.SH CONFIGURATION
+Configuration is stored in
+.BR ~/.config/rexit/config.toml .
+All fields are optional, and defaults will be used for missing values.
+.SS Basic Options
+.TP
+.BR title
+Window title shown in the border (default: " rexit ")
+.TP
+.BR title_alignment
+Title alignment: "left", "center", or "right" (default: "center")
+.TP
+.BR layout_mode
+Layout mode: "vertical", "horizontal", "grid", or "compact" (default: "vertical")
+.TP
+.BR wm_type
+Window manager: "auto", "hyprland", "sway", "i3", "bspwm", or "awesome" (default: "auto")
+.SS Colors Section
+.TP
+.BR foreground
+Default text color
+.TP
+.BR background
+Background color
+.TP
+.BR border
+Border color
+.TP
+.BR selected_fg
+Selected item text color
+.TP
+.BR selected_bg
+Selected item background color
+.TP
+.BR selected_modifier
+Text modifiers for selected items: "bold", "italic", "underlined"
+.TP
+.BR icon_color
+Action icon color
+.SS Animation Section
+.TP
+.BR enabled
+Enable background animation (default: true)
+.TP
+.BR animation_type
+Type of animation: "matrix", "rain", "snow", "stars", "fireflies", etc.
+.TP
+.BR speed_ms
+Animation speed in milliseconds (default: 80)
+.TP
+.BR adaptive_quality
+Reduce quality under high CPU load (default: true)
+.TP
+.BR min_speed_ms
+Minimum animation speed in degraded mode (default: 200)
+.SS Responsive Section
+.TP
+.BR enabled
+Enable responsive layout adjustments (default: true)
+.TP
+.BR compact_threshold
+Switch to compact layout below this width (default: 80)
+.TP
+.BR minimal_threshold
+Switch to minimal layout below this width (default: 40)
+.SH THEMES
+Themes are stored in
+.BR ~/.config/rexit/themes/
+as TOML files. A theme file contains color, border, and animation settings.
+.PP
+Example theme structure:
+.PP
+.nf
+[colors]
+foreground = "#f8f8f2"
+background = "#282a36"
+border = "#bd93f9"
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+animation_type = "matrix"
+speed_ms = 80
+color = "#50fa7b"
+.fi
+.SH ENVIRONMENT
+.TP
+.BR REXIT_USE_EMOJI
+Set to "1" or "true" to force emoji icons instead of Nerd Fonts
+.TP
+.BR HYPRLAND_INSTANCE_SIGNATURE
+Used for automatic Hyprland detection
+.TP
+.BR SWAYSOCK
+Used for automatic Sway detection
+.TP
+.BR XDG_SESSION_DESKTOP
+Used for window manager detection
+.SH FILES
+.TP
+.BR ~/.config/rexit/config.toml
+Main configuration file
+.TP
+.BR ~/.config/rexit/themes/
+Directory containing theme files
+.TP
+.BR ~/.config/rexit/last_executed
+Stores the last executed action for persistence
+.SH EXAMPLES
+.PP
+Launch rexit with default settings:
+.PP
+.nf
+$ rexit
+.fi
+.PP
+Generate default configuration:
+.PP
+.nf
+$ rexit --init
+.fi
+.PP
+Use a specific theme:
+.PP
+.nf
+$ rexit --theme dracula
+.fi
+.PP
+Use emoji icons:
+.PP
+.nf
+$ rexit --emoji
+.fi
+.PP
+Validate configuration:
+.PP
+.nf
+$ rexit --check-config
+.fi
+.PP
+List available themes:
+.PP
+.nf
+$ rexit --list-themes
+.fi
+.SH SEE ALSO
+.BR systemctl (1),
+.BR hyprctl (1),
+.BR swaymsg (1),
+.BR i3-msg (1)
+.SH AUTHOR
+Written by Ninso112.
+.SH REPORTING BUGS
+Report bugs at: https://github.com/Ninso112/rexit/issues
+.SH COPYRIGHT
+Copyright (C) 2025 Ninso112.
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+.PP
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.

@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, MouseEvent,
+    },
     execute,
     terminal::{
         self, disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -22,6 +24,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::Instant;
 
 // ============================================================================
 // CONFIGURATION
@@ -55,6 +58,9 @@ pub struct Config {
     /// Background animation configuration
     pub animation: AnimationConfig,
 
+    /// Responsive layout settings
+    pub responsive: ResponsiveConfig,
+
     /// Layout mode: "vertical", "horizontal", "grid", "compact"
     pub layout_mode: String,
 
@@ -63,6 +69,35 @@ pub struct Config {
 
     /// Grace period configuration for critical actions
     pub grace_period: GracePeriodConfig,
+
+    /// Theme file to load (optional)
+    pub theme: Option<String>,
+
+    /// Whether to use emoji icons as fallback (auto-detected if not set)
+    pub use_emoji_icons: Option<bool>,
+
+    /// Performance settings
+    pub performance: PerformanceSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceSettings {
+    /// Enable automatic quality reduction under high CPU load
+    pub auto_degrade: bool,
+    /// Target frame time in milliseconds (higher = less CPU usage)
+    pub target_fps: u32,
+    /// Disable animations when battery is low (laptops)
+    pub disable_on_low_battery: bool,
+}
+
+impl Default for PerformanceSettings {
+    fn default() -> Self {
+        Self {
+            auto_degrade: true,
+            target_fps: 30,
+            disable_on_low_battery: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +131,8 @@ pub struct KeyConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionConfig {
     pub icon: String,
+    /// Fallback icon using emoji (used when Nerd Fonts are not available)
+    pub icon_fallback: Option<String>,
     pub label: String,
     pub command: String,
     pub args: Vec<String>,
@@ -106,6 +143,123 @@ pub struct ActionConfig {
     pub favorite: bool,
     /// Optional keyboard shortcut for quick access (e.g., "s", "1", "Ctrl-s")
     pub shortcut: String,
+}
+
+/// Theme configuration for loading themes from files
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThemeConfig {
+    pub name: String,
+    pub colors: ColorConfig,
+    pub border: BorderConfig,
+    pub animation: AnimationConfig,
+}
+
+/// System monitoring for graceful degradation
+#[derive(Debug, Clone)]
+pub struct PerformanceMonitor {
+    last_check: Instant,
+    frame_times: Vec<u64>,
+    degraded_mode: bool,
+    last_frame_time: u64,
+}
+
+impl PerformanceMonitor {
+    pub fn new() -> Self {
+        Self {
+            last_check: Instant::now(),
+            frame_times: Vec::with_capacity(30),
+            degraded_mode: false,
+            last_frame_time: 0,
+        }
+    }
+
+    pub fn record_frame(&mut self, frame_time_ms: u64) {
+        self.last_frame_time = frame_time_ms;
+        self.frame_times.push(frame_time_ms);
+        if self.frame_times.len() > 30 {
+            self.frame_times.remove(0);
+        }
+    }
+
+    pub fn update(&mut self) {
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.last_check).as_secs();
+
+        if elapsed >= 2 {
+            // Calculate average frame time
+            let avg_frame_time = if !self.frame_times.is_empty() {
+                self.frame_times.iter().sum::<u64>() / self.frame_times.len() as u64
+            } else {
+                0
+            };
+
+            // Enable degraded mode if frame times are consistently long (>100ms)
+            self.degraded_mode = avg_frame_time > 100 || self.last_frame_time > 150;
+
+            // Clear frame times for next measurement period
+            self.frame_times.clear();
+            self.last_check = now;
+        }
+    }
+
+    pub fn is_degraded(&self) -> bool {
+        self.degraded_mode
+    }
+
+    pub fn should_skip_frame(&self, frame_counter: u64) -> bool {
+        if self.degraded_mode {
+            // Skip every other frame in degraded mode
+            frame_counter % 2 == 0
+        } else {
+            false
+        }
+    }
+}
+
+/// Check if Nerd Fonts are available in the terminal
+pub fn has_nerd_fonts() -> bool {
+    // Check environment variable override
+    if let Ok(val) = std::env::var("REXIT_USE_EMOJI") {
+        return val != "1" && val != "true";
+    }
+
+    // Try to detect by checking common Nerd Font indicators
+    if let Ok(term_program) = std::env::var("TERM_PROGRAM") {
+        match term_program.as_str() {
+            "Apple_Terminal" => return false, // macOS Terminal doesn't support Nerd Fonts well
+            _ => {}
+        }
+    }
+
+    // Check if we're in a Linux console (no Nerd Fonts support)
+    if let Ok(term) = std::env::var("TERM") {
+        if term == "linux" {
+            return false;
+        }
+    }
+
+    // Default to assuming Nerd Fonts are available on modern terminals
+    true
+}
+
+/// Get the appropriate icon based on Nerd Font availability
+pub fn get_icon(config: &ActionConfig) -> &str {
+    if has_nerd_fonts() {
+        &config.icon
+    } else {
+        config.icon_fallback.as_deref().unwrap_or_else(|| {
+            // Default emoji fallbacks
+            match config.icon.as_str() {
+                "⏻" => "⏻",
+                "🔄" => "🔄",
+                "🌙" => "🌙",
+                "🔒" => "🔒",
+                "🚪" => "🚪",
+                "❌" => "❌",
+                _ => "•", // default bullet
+            }
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,6 +285,38 @@ pub struct LayoutConfig {
     pub padding: u16,
 }
 
+/// Responsive layout configuration for adapting to terminal size
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResponsiveConfig {
+    /// Enable responsive layout adjustments (default: true)
+    pub enabled: bool,
+    /// Switch to compact layout when terminal width is below this threshold (default: 80)
+    pub compact_threshold: u16,
+    /// Switch to minimal layout when terminal width is below this threshold (default: 40)
+    pub minimal_threshold: u16,
+    /// Adjust font size or spacing (when supported by terminal)
+    pub auto_adjust_spacing: bool,
+    /// Hide border when terminal is very small
+    pub hide_border_when_small: bool,
+    /// Minimum terminal dimensions to show the UI (default: 20x5)
+    pub min_terminal_width: u16,
+    pub min_terminal_height: u16,
+}
+
+impl Default for ResponsiveConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            compact_threshold: 80,
+            minimal_threshold: 40,
+            auto_adjust_spacing: true,
+            hide_border_when_small: true,
+            min_terminal_width: 20,
+            min_terminal_height: 5,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnimationConfig {
     /// Enable background animation
@@ -143,6 +329,10 @@ pub struct AnimationConfig {
     pub color: String,
     /// Animation density (0-100, higher = more particles)
     pub density: u8,
+    /// Reduce animation quality when CPU is high (default: true)
+    pub adaptive_quality: bool,
+    /// Minimum animation speed in degraded mode (default: 200ms)
+    pub min_speed_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,7 +354,8 @@ impl Default for Config {
         actions.insert(
             "shutdown".to_string(),
             ActionConfig {
-                icon: "\u{f011}".to_string(),
+                icon: "⏻".to_string(),
+                icon_fallback: Some("⏻".to_string()),
                 label: "Shutdown".to_string(),
                 command: "systemctl".to_string(),
                 args: vec!["poweroff".to_string()],
@@ -178,7 +369,8 @@ impl Default for Config {
         actions.insert(
             "reboot".to_string(),
             ActionConfig {
-                icon: "\u{f021}".to_string(),
+                icon: "🔄".to_string(),
+                icon_fallback: Some("🔄".to_string()),
                 label: "Reboot".to_string(),
                 command: "systemctl".to_string(),
                 args: vec!["reboot".to_string()],
@@ -192,7 +384,8 @@ impl Default for Config {
         actions.insert(
             "suspend".to_string(),
             ActionConfig {
-                icon: "\u{f186}".to_string(),
+                icon: "🌙".to_string(),
+                icon_fallback: Some("🌙".to_string()),
                 label: "Suspend".to_string(),
                 command: "systemctl".to_string(),
                 args: vec!["suspend".to_string()],
@@ -206,7 +399,8 @@ impl Default for Config {
         actions.insert(
             "lock".to_string(),
             ActionConfig {
-                icon: "\u{f023}".to_string(),
+                icon: "🔒".to_string(),
+                icon_fallback: Some("🔒".to_string()),
                 label: "Lock".to_string(),
                 command: "hyprlock".to_string(),
                 args: vec![],
@@ -220,7 +414,8 @@ impl Default for Config {
         actions.insert(
             "logout".to_string(),
             ActionConfig {
-                icon: "\u{f08b}".to_string(),
+                icon: "🚪".to_string(),
+                icon_fallback: Some("🚪".to_string()),
                 label: "Logout".to_string(),
                 command: "hyprctl".to_string(),
                 args: vec!["dispatch".to_string(), "exit".to_string()],
@@ -234,7 +429,8 @@ impl Default for Config {
         actions.insert(
             "cancel".to_string(),
             ActionConfig {
-                icon: "\u{f00d}".to_string(),
+                icon: "❌".to_string(),
+                icon_fallback: Some("❌".to_string()),
                 label: "Cancel".to_string(),
                 command: "".to_string(),
                 args: vec![],
@@ -299,7 +495,10 @@ impl Default for Config {
                 speed_ms: 80,
                 color: "green".to_string(),
                 density: 50,
+                adaptive_quality: true,
+                min_speed_ms: 200,
             },
+            responsive: ResponsiveConfig::default(),
             layout_mode: "vertical".to_string(),
             wm_type: "auto".to_string(),
             grace_period: GracePeriodConfig {
@@ -309,6 +508,9 @@ impl Default for Config {
                 message_template: "⏱️  {action} in {seconds}s... Press any key to cancel"
                     .to_string(),
             },
+            theme: None,
+            use_emoji_icons: None,
+            performance: PerformanceSettings::default(),
         }
     }
 }
@@ -444,6 +646,14 @@ layout_mode = "vertical"
 ## When set to "auto", rexit will detect your WM automatically
 wm_type = "auto"
 
+## Theme file (optional)
+## Load a theme from ~/.config/rexit/themes/<name>.toml
+## theme = "dracula"
+
+## Use emoji icons instead of Nerd Fonts (auto-detected if not set)
+## Set to true if your terminal doesn't support Nerd Fonts
+## use_emoji_icons = false
+
 [border]
 enabled = true
 style = "rounded"  ## Options: "plain", "rounded", "double", "thick"
@@ -475,7 +685,8 @@ select = ["Enter"]
 quit = ["Esc", "q"]
 
 [actions.shutdown]
-icon = "\u{f011}"  # nf-fa-power_off
+icon = "⏻"  # Power symbol (was: \u{f011})
+icon_fallback = "⏻"  ## Emoji fallback when Nerd Fonts are not available
 label = "Shutdown"
 command = "systemctl"
 args = ["poweroff"]
@@ -485,7 +696,8 @@ favorite = true     ## Show at top of list
 shortcut = "s"      ## Press s to select
 
 [actions.reboot]
-icon = "\u{f021}"  # nf-fa-refresh
+icon = "🔄"  # Refresh symbol (was: \u{f021})
+icon_fallback = "🔄"
 label = "Reboot"
 command = "systemctl"
 args = ["reboot"]
@@ -495,7 +707,8 @@ favorite = true
 shortcut = "r"
 
 [actions.suspend]
-icon = "\u{f186}"  # nf-fa-moon_o
+icon = "🌙"  # Moon symbol (was: \u{f186})
+icon_fallback = "🌙"
 label = "Suspend"
 command = "systemctl"
 args = ["suspend"]
@@ -505,7 +718,8 @@ favorite = false
 shortcut = "u"
 
 [actions.lock]
-icon = "\u{f023}"  # nf-fa-lock
+icon = "🔒"  # Lock symbol (was: \u{f023})
+icon_fallback = "🔒"
 label = "Lock"
 command = "hyprlock"
 args = []
@@ -515,7 +729,8 @@ favorite = false
 shortcut = "l"
 
 [actions.logout]
-icon = "\u{f08b}"
+icon = "🚪"  # Door symbol (was: \u{f08b})
+icon_fallback = "🚪"
 label = "Logout"
 command = "hyprctl"
 args = ["dispatch", "exit"]
@@ -525,7 +740,8 @@ favorite = false
 shortcut = "o"
 
 [actions.cancel]
-icon = "\u{f00d}"
+icon = "❌"  # X mark (was: \u{f00d})
+icon_fallback = "❌"
 label = "Cancel"
 command = ""
 args = []
@@ -553,6 +769,16 @@ max_width = 60
 ## Padding inside the menu box (default: 1)
 padding = 1
 
+[responsive]
+## Responsive layout settings
+enabled = true                    ## Enable responsive layout adjustments
+compact_threshold = 80            ## Switch to compact below this width
+minimal_threshold = 40            ## Switch to minimal below this width
+auto_adjust_spacing = true        ## Adjust spacing automatically
+hide_border_when_small = true     ## Hide border when terminal is small
+min_terminal_width = 20           ## Minimum terminal width required
+min_terminal_height = 5           ## Minimum terminal height required
+
 [animation]
 ## Background animation settings
 ## Animation types: "matrix", "matrix_cjk", "rain", "thunder", "snow", "stars", "fireflies", "fireworks", "neon_grid", "perlin_flow", "cube_3d", "fractals", "bubbles", "confetti", "wave", "particles", "digital_rain", "heartbeat", "plasma", "scanlines", "aurora", "autumn", "dna", "synthwave", "smoke", "gradient_flow", "constellation", "fish_tank", "typing_code", "vortex", "circuit", "flow_field", "morse", "lissajous", "game_of_life", "ocean", "ripple", "fog", "flames", "sparks", "lava_lamp", "sun", "galaxy", "meteor_shower", "satellite", "pulsar", "pong", "snake", "tetris", "invaders", "fibonacci", "mandelbrot", "hex_grid", "rose", "butterflies", "spider_web", "vine_growth", "moss", "radar", "binary_clock", "signal", "wifi", "paint_splatter", "ink_bleed", "mosaic", "stained_glass", "hologram", "glitch", "old_film", "thermal", "none"
@@ -561,6 +787,8 @@ animation_type = "matrix"
 speed_ms = 80
 color = "green"
 density = 50
+adaptive_quality = true           ## Reduce quality under high CPU load
+min_speed_ms = 200                ## Minimum animation speed in degraded mode
 
 [grace_period]
 ## Grace period configuration for critical actions (shutdown, reboot)
@@ -569,8 +797,132 @@ enabled = true
 duration_secs = 5
 show_countdown = true
 message_template = "⏱️  {action} in {seconds}s... Press any key to cancel"
+
+[performance]
+## Performance settings
+auto_degrade = true               ## Enable automatic quality reduction under high CPU
+target_fps = 30                   ## Target frame rate (higher = smoother but more CPU)
+disable_on_low_battery = false    ## Disable animations when battery is low (laptops)
 "##,
     )
+}
+
+// ============================================================================
+// THEME LOADING
+// ============================================================================
+
+fn get_themes_dir() -> Option<PathBuf> {
+    ProjectDirs::from("", "", "rexit").map(|dirs| dirs.config_dir().join("themes"))
+}
+
+fn get_theme_path(theme_name: &str) -> Option<PathBuf> {
+    get_themes_dir().map(|dir| dir.join(format!("{}.toml", theme_name)))
+}
+
+fn load_theme(theme_name: &str) -> Option<ThemeConfig> {
+    let theme_path = get_theme_path(theme_name)?;
+
+    if !theme_path.exists() {
+        eprintln!(
+            "Warning: Theme '{}' not found at {}",
+            theme_name,
+            theme_path.display()
+        );
+        return None;
+    }
+
+    match fs::read_to_string(&theme_path) {
+        Ok(content) => match toml::from_str::<ThemeConfig>(&content) {
+            Ok(theme) => {
+                return Some(theme);
+            }
+            Err(e) => {
+                eprintln!("Warning: Failed to parse theme '{}': {}", theme_name, e);
+            }
+        },
+        Err(e) => {
+            eprintln!("Warning: Failed to read theme '{}': {}", theme_name, e);
+        }
+    }
+    None
+}
+
+fn list_available_themes() -> Vec<String> {
+    let mut themes = Vec::new();
+
+    if let Some(themes_dir) = get_themes_dir() {
+        if let Ok(entries) = fs::read_dir(themes_dir) {
+            for entry in entries.flatten() {
+                if let Some(name) = entry.file_name().to_str() {
+                    if name.ends_with(".toml") {
+                        themes.push(name[..name.len() - 5].to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    themes
+}
+
+fn merge_theme_into_config(config: &mut Config, theme: ThemeConfig) {
+    config.colors = theme.colors;
+    config.border = theme.border;
+    config.animation.animation_type = theme.animation.animation_type;
+    config.animation.speed_ms = theme.animation.speed_ms;
+    config.animation.color = theme.animation.color;
+    config.animation.density = theme.animation.density;
+    config.animation.adaptive_quality = theme.animation.adaptive_quality;
+    config.animation.min_speed_ms = theme.animation.min_speed_ms;
+}
+
+fn check_command_exists(command: &str) -> bool {
+    if command.is_empty() {
+        return true;
+    }
+
+    // Handle commands with paths
+    if command.contains('/') {
+        return PathBuf::from(command).exists();
+    }
+
+    // Check in PATH
+    if let Ok(path_var) = std::env::var("PATH") {
+        for path in path_var.split(':') {
+            let full_path = PathBuf::from(path).join(command);
+            if full_path.exists() {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+fn find_lock_command() -> (String, Vec<String>) {
+    // Try common lock commands in order of preference
+    let lock_commands = [
+        ("hyprlock", vec![]),
+        ("swaylock", vec![]),
+        ("i3lock", vec![]),
+        ("i3lock-fancy", vec![]),
+        ("betterlockscreen", vec!["--lock".to_string()]),
+        ("xlock", vec![]),
+        ("slock", vec![]),
+        ("xflock4", vec![]),
+        ("gnome-screensaver-command", vec!["--lock".to_string()]),
+        ("xscreensaver-command", vec!["--lock".to_string()]),
+        ("loginctl", vec!["lock-session".to_string()]),
+    ];
+
+    for (cmd, args) in lock_commands {
+        if check_command_exists(cmd) {
+            return (cmd.to_string(), args);
+        }
+    }
+
+    // Fallback to loginctl as it should work on most systemd systems
+    ("loginctl".to_string(), vec!["lock-session".to_string()])
 }
 
 // ============================================================================
@@ -744,6 +1096,7 @@ struct App {
     easter_egg: EasterEggState,
     animation_menu_index: usize,
     grace_period_cancelled: bool, // Track if grace period was cancelled
+    performance_monitor: PerformanceMonitor,
 }
 
 const ANIMATION_TYPES: &[&str; 71] = &[
@@ -1341,18 +1694,31 @@ impl App {
     }
 
     fn new(config: Config) -> Self {
+        // Determine if we should use emoji icons
+        let use_emoji = config.use_emoji_icons.unwrap_or_else(|| !has_nerd_fonts());
+
         let mut actions: Vec<Action> = config
             .actions
             .iter()
             .filter(|(_, action_config)| action_config.enabled)
-            .map(|(_id, action_config)| Action {
-                icon: action_config.icon.clone(),
-                label: action_config.label.clone(),
-                command: action_config.command.clone(),
-                args: action_config.args.clone(),
-                confirm: action_config.confirm,
-                favorite: action_config.favorite,
-                shortcut: action_config.shortcut.clone(),
+            .map(|(_id, action_config)| {
+                let icon = if use_emoji {
+                    action_config
+                        .icon_fallback
+                        .clone()
+                        .unwrap_or_else(|| get_icon(action_config).to_string())
+                } else {
+                    action_config.icon.clone()
+                };
+                Action {
+                    icon,
+                    label: action_config.label.clone(),
+                    command: action_config.command.clone(),
+                    args: action_config.args.clone(),
+                    confirm: action_config.confirm,
+                    favorite: action_config.favorite,
+                    shortcut: action_config.shortcut.clone(),
+                }
             })
             .collect();
 
@@ -1389,6 +1755,17 @@ impl App {
             }
         }
 
+        // Check for lock command availability and fallback if needed
+        for action in &mut actions {
+            if action.label.to_lowercase().contains("lock") {
+                if !check_command_exists(&action.command) {
+                    let (cmd, args) = find_lock_command();
+                    action.command = cmd;
+                    action.args = args;
+                }
+            }
+        }
+
         let mut app = Self {
             actions,
             selected_index,
@@ -1400,6 +1777,7 @@ impl App {
             easter_egg: EasterEggState::new(),
             animation_menu_index: 0,
             grace_period_cancelled: false,
+            performance_monitor: PerformanceMonitor::new(),
         };
 
         // Initialize animation based on terminal size
@@ -1591,14 +1969,40 @@ impl App {
             return;
         }
 
+        // Update performance monitor
+        self.performance_monitor.update();
+
+        // Check if we should skip this frame due to degraded performance
+        if self.config.performance.auto_degrade
+            && self
+                .performance_monitor
+                .should_skip_frame(self.animation_state.tick)
+        {
+            return;
+        }
+
         let now = std::time::Instant::now();
         let elapsed = now
             .duration_since(self.animation_state.last_update)
             .as_millis() as u64;
 
-        if elapsed < self.config.animation.speed_ms {
+        // Calculate target frame time from FPS setting
+        let target_frame_time = 1000 / self.config.performance.target_fps as u64;
+
+        // Use min_speed_ms in degraded mode or if adaptive quality is enabled and CPU is high
+        let speed_ms =
+            if self.config.animation.adaptive_quality && self.performance_monitor.is_degraded() {
+                self.config.animation.min_speed_ms.max(target_frame_time)
+            } else {
+                self.config.animation.speed_ms.max(target_frame_time)
+            };
+
+        if elapsed < speed_ms {
             return;
         }
+
+        // Record frame time for performance monitoring
+        self.performance_monitor.record_frame(elapsed);
 
         self.animation_state.last_update = now;
         self.animation_state.tick += 1;
@@ -7875,7 +8279,7 @@ fn render_help_text(f: &mut Frame, app: &App, size: Rect) {
 #[derive(Parser)]
 #[command(name = "rexit")]
 #[command(author = "Ninso112")]
-#[command(version = "1.1.5")]
+#[command(version = "1.1.6")]
 #[command(about = "A rice-ready TUI power menu for Linux with multi-WM support", long_about = None)]
 struct Cli {
     /// Generate default configuration file
@@ -7885,6 +8289,22 @@ struct Cli {
     /// Specify custom config file path
     #[arg(short, long, value_name = "PATH")]
     config: Option<PathBuf>,
+
+    /// Specify theme to use (loads from ~/.config/rexit/themes/<name>.toml)
+    #[arg(short, long, value_name = "NAME")]
+    theme: Option<String>,
+
+    /// List available themes
+    #[arg(long)]
+    list_themes: bool,
+
+    /// Validate configuration file and exit
+    #[arg(long)]
+    check_config: bool,
+
+    /// Use emoji icons instead of Nerd Fonts
+    #[arg(long)]
+    emoji: bool,
 }
 
 fn main() -> Result<()> {
@@ -7895,12 +8315,59 @@ fn main() -> Result<()> {
         return generate_config_file();
     }
 
+    // Handle --list-themes flag
+    if cli.list_themes {
+        println!("Available themes:");
+        let themes = list_available_themes();
+        if themes.is_empty() {
+            println!("  No themes found in ~/.config/rexit/themes/");
+            println!("  Create theme files with .toml extension in that directory.");
+        } else {
+            for theme in themes {
+                println!("  - {}", theme);
+            }
+        }
+        return Ok(());
+    }
+
     // Load configuration
-    let config = if let Some(config_path) = cli.config {
+    let mut config = if let Some(config_path) = cli.config {
         load_config_from_path(&config_path)?
     } else {
         load_config()
     };
+
+    // Handle --theme flag
+    if let Some(theme_name) = cli.theme {
+        if let Some(theme) = load_theme(&theme_name) {
+            merge_theme_into_config(&mut config, theme);
+        }
+    } else if let Some(ref theme_name) = config.theme {
+        // Load theme from config file if specified
+        if let Some(theme) = load_theme(theme_name) {
+            merge_theme_into_config(&mut config, theme);
+        }
+    }
+
+    // Handle --emoji flag
+    if cli.emoji {
+        config.use_emoji_icons = Some(true);
+    }
+
+    // Handle --check-config flag
+    if cli.check_config {
+        println!("Configuration is valid!");
+        if let Some(ref theme) = config.theme {
+            println!("Active theme: {}", theme);
+        }
+        println!("Layout mode: {}", config.layout_mode);
+        println!("Animation: {}", config.animation.animation_type);
+        println!(
+            "Actions enabled: {}",
+            config.actions.values().filter(|a| a.enabled).count()
+        );
+        return Ok(());
+    }
 
     // Setup terminal
     enable_raw_mode().context("Failed to enable raw mode")?;
@@ -7968,6 +8435,43 @@ fn load_config_from_path(path: &PathBuf) -> Result<Config> {
 }
 
 fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
+    // Calculate responsive layout mode based on terminal size
+    let (cols, rows) = terminal::size().unwrap_or((80, 24));
+    let size = Rect::new(0, 0, cols, rows);
+
+    // Check if terminal is too small
+    if app.config.responsive.enabled {
+        if cols < app.config.responsive.min_terminal_width
+            || rows < app.config.responsive.min_terminal_height
+        {
+            return Err(anyhow::anyhow!(
+                "Terminal too small: {}x{}. Minimum required: {}x{}",
+                cols,
+                rows,
+                app.config.responsive.min_terminal_width,
+                app.config.responsive.min_terminal_height
+            ));
+        }
+
+        // Auto-switch to compact layout if terminal is narrow
+        if app.config.layout_mode == "vertical" && cols < app.config.responsive.compact_threshold {
+            app.config.layout_mode = "compact".to_string();
+        }
+
+        // Auto-switch to minimal (horizontal) if terminal is very narrow
+        if app.config.layout_mode == "compact" && cols < app.config.responsive.minimal_threshold {
+            app.config.layout_mode = "horizontal".to_string();
+        }
+
+        // Disable border if terminal is small
+        if app.config.responsive.hide_border_when_small && (cols < 60 || rows < 15) {
+            app.config.border.enabled = false;
+        }
+    }
+
+    // Initialize animation with actual terminal size
+    app.animation_state.init(&app.config, size);
+
     loop {
         terminal.draw(|f| ui(f, app))?;
 
@@ -7983,24 +8487,30 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut A
         }
 
         if event::poll(std::time::Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    // Handle different states
-                    match &app.state {
-                        AppState::Confirming { .. } => {
-                            handle_confirmation_input(app, &key)?;
-                        }
-                        AppState::GracePeriod { .. } => {
-                            handle_grace_period_input(app, &key)?;
-                        }
-                        AppState::AnimationMenu => {
-                            handle_animation_menu_input(app, &key)?;
-                        }
-                        AppState::Selecting => {
-                            handle_selecting_input(app, &key)?;
+            match event::read()? {
+                Event::Key(key) => {
+                    if key.kind == KeyEventKind::Press {
+                        // Handle different states
+                        match &app.state {
+                            AppState::Confirming { .. } => {
+                                handle_confirmation_input(app, &key)?;
+                            }
+                            AppState::GracePeriod { .. } => {
+                                handle_grace_period_input(app, &key)?;
+                            }
+                            AppState::AnimationMenu => {
+                                handle_animation_menu_input(app, &key)?;
+                            }
+                            AppState::Selecting => {
+                                handle_selecting_input(app, &key)?;
+                            }
                         }
                     }
                 }
+                Event::Mouse(mouse) => {
+                    handle_mouse_input(app, mouse)?;
+                }
+                _ => {}
             }
         }
     }
@@ -8126,4 +8636,152 @@ fn handle_selecting_input(app: &mut App, key: &crossterm::event::KeyEvent) -> Re
     }
 
     Ok(())
+}
+
+fn handle_mouse_input(app: &mut App, mouse: MouseEvent) -> Result<()> {
+    use crossterm::event::MouseEventKind;
+
+    match app.state {
+        AppState::Selecting => {
+            match mouse.kind {
+                MouseEventKind::Down(_) => {
+                    // Check if click is within the menu area
+                    let (cols, rows) = terminal::size().unwrap_or((80, 24));
+                    let size = Rect::new(0, 0, cols, rows);
+
+                    // Calculate menu area based on layout mode
+                    let menu_area = if app.config.layout.auto_scale {
+                        calculate_auto_layout_menu_area(app, size)
+                    } else {
+                        calculate_fixed_layout_menu_area(app, size)
+                    };
+
+                    // Check if click is inside menu area
+                    if mouse.column >= menu_area.x
+                        && mouse.column < menu_area.x + menu_area.width
+                        && mouse.row >= menu_area.y
+                        && mouse.row < menu_area.y + menu_area.height
+                    {
+                        // Calculate which item was clicked
+                        let relative_y = mouse.row.saturating_sub(menu_area.y);
+                        let border_offset = if app.config.border.enabled { 1 } else { 0 };
+                        let padding = app.config.layout.padding;
+                        let item_index =
+                            (relative_y.saturating_sub(border_offset + padding)) as usize;
+
+                        if item_index < app.actions.len() {
+                            app.selected_index = item_index;
+                            app.select()?;
+                        }
+                    }
+                }
+                MouseEventKind::ScrollUp => {
+                    app.previous();
+                }
+                MouseEventKind::ScrollDown => {
+                    app.next();
+                }
+                _ => {}
+            }
+        }
+        AppState::Confirming { action_index: _ } => {
+            match mouse.kind {
+                MouseEventKind::Down(_) => {
+                    // Simple click anywhere cancels confirmation
+                    app.confirm_no();
+                }
+                _ => {}
+            }
+        }
+        AppState::GracePeriod { .. } => {
+            match mouse.kind {
+                MouseEventKind::Down(_) => {
+                    // Any click cancels grace period
+                    app.cancel_grace_period();
+                }
+                _ => {}
+            }
+        }
+        AppState::AnimationMenu => match mouse.kind {
+            MouseEventKind::ScrollUp => {
+                app.previous_animation();
+            }
+            MouseEventKind::ScrollDown => {
+                app.next_animation();
+            }
+            _ => {}
+        },
+    }
+
+    Ok(())
+}
+
+// Helper function to calculate menu area for mouse input (auto layout)
+fn calculate_auto_layout_menu_area(app: &App, size: Rect) -> Rect {
+    let config = &app.config;
+
+    // Calculate content dimensions
+    let max_label_width = app
+        .actions
+        .iter()
+        .map(|action| action.display_text(true).chars().count())
+        .max()
+        .unwrap_or(0) as u16;
+
+    let padding = config.layout.padding;
+    let border_width = if config.border.enabled { 2 } else { 0 };
+    let title_width = config.title.chars().count() as u16;
+
+    let content_width = max_label_width.max(title_width.saturating_sub(2));
+    let menu_width = content_width + (padding * 2) + border_width;
+
+    let final_width = if config.layout.max_width > 0 {
+        menu_width.min(config.layout.max_width)
+    } else {
+        menu_width
+    };
+    let final_width = final_width.max(config.layout.min_width);
+
+    let action_count = app.actions.len() as u16;
+    let menu_height = action_count + (padding * 2) + border_width;
+    let final_height = menu_height.max(config.layout.min_height);
+
+    let x = (size.width.saturating_sub(final_width)) / 2;
+    let y = (size.height.saturating_sub(final_height)) / 2;
+
+    Rect {
+        x,
+        y,
+        width: final_width,
+        height: final_height,
+    }
+}
+
+// Helper function to calculate menu area for mouse input (fixed layout)
+fn calculate_fixed_layout_menu_area(app: &App, size: Rect) -> Rect {
+    let config = &app.config;
+
+    let vertical_constraints = vec![
+        Constraint::Percentage(config.layout.vertical_margin),
+        Constraint::Min(config.layout.min_height),
+        Constraint::Percentage(config.layout.vertical_margin),
+    ];
+
+    let vertical_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vertical_constraints)
+        .split(size);
+
+    let horizontal_constraints = vec![
+        Constraint::Percentage(config.layout.horizontal_margin),
+        Constraint::Min(config.layout.min_width),
+        Constraint::Percentage(config.layout.horizontal_margin),
+    ];
+
+    let horizontal_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(horizontal_constraints)
+        .split(vertical_chunks[1]);
+
+    horizontal_chunks[1]
 }

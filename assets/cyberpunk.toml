@@ -1,0 +1,23 @@
+[colors]
+foreground = "#00f0ff"
+background = "#0a0a0f"
+border = "#ff00ff"
+selected_fg = "#0a0a0f"
+selected_bg = "#00f0ff"
+selected_modifier = ["bold"]
+icon_color = "#ffff00"
+help_fg = "#4a4a6a"
+help_key_fg = "#ff00ff"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+animation_type = "neon_grid"
+speed_ms = 60
+color = "#00f0ff"
+density = 60
+adaptive_quality = true
+min_speed_ms = 200

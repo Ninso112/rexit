@@ -1,0 +1,23 @@
+[colors]
+foreground = "#575279"
+background = "#faf4ed"
+border = "#907aa9"
+selected_fg = "#faf4ed"
+selected_bg = "#907aa9"
+selected_modifier = ["bold"]
+icon_color = "#d7827e"
+help_fg = "#9893a5"
+help_key_fg = "#56949f"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+animation_type = "bubbles"
+speed_ms = 100
+color = "#b4637a"
+density = 40
+adaptive_quality = true
+min_speed_ms = 200

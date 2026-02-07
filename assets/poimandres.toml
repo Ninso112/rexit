@@ -1,0 +1,23 @@
+[colors]
+foreground = "#a6accd"
+background = "#1b1e28"
+border = "#89ddff"
+selected_fg = "#1b1e28"
+selected_bg = "#89ddff"
+selected_modifier = ["bold"]
+icon_color = "#ff5370"
+help_fg = "#4a5070"
+help_key_fg = "#c792ea"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+animation_type = "stars"
+speed_ms = 100
+color = "#89ddff"
+density = 45
+adaptive_quality = true
+min_speed_ms = 200

@@ -5,6 +5,9 @@ set -e
 REPO_URL="https://github.com/Ninso112/rexit"
 CARGO_BIN="${HOME}/.cargo/bin"
 TARGET_BIN="/usr/local/bin"
+CONFIG_DIR="${HOME}/.config/rexit"
+THEMES_DIR="${CONFIG_DIR}/themes"
+MAN_DIR="/usr/local/share/man/man1"
 
 echo "=========================================="
 echo "     rexit - Installation Script"
@@ -49,6 +52,39 @@ if cargo install --git "$REPO_URL" --force; then
         echo "    sudo cp $CARGO_BIN/rexit $TARGET_BIN/"
     fi
 
+    # Create config directory
+    echo "→ Creating config directory..."
+    mkdir -p "$THEMES_DIR"
+    echo "✓ Config directory created at $CONFIG_DIR"
+
+    # Install themes if they exist in the repository
+    if [ -d "assets" ]; then
+        echo "→ Installing themes..."
+        for theme in assets/*.toml; do
+            if [ -f "$theme" ]; then
+                cp "$theme" "$THEMES_DIR/"
+                echo "  ✓ Installed $(basename "$theme")"
+            fi
+        done
+        echo "✓ Themes installed to $THEMES_DIR"
+    fi
+
+    # Install man page if possible
+    echo "→ Installing man page..."
+    if [ -f "assets/rexit.1" ]; then
+        if sudo cp "assets/rexit.1" "$MAN_DIR/rexit.1" 2>/dev/null; then
+            sudo chmod 644 "$MAN_DIR/rexit.1"
+            if command -v mandb >/dev/null 2>&1; then
+                sudo mandb >/dev/null 2>&1
+            fi
+            echo "✓ Man page installed to $MAN_DIR/rexit.1"
+        else
+            echo "⚠ Could not install man page (sudo required)"
+            echo "  To install manually, run:"
+            echo "    sudo cp assets/rexit.1 $MAN_DIR/"
+        fi
+    fi
+
     echo ""
     echo "=========================================="
     echo "     ✓ Installation successful!"
@@ -59,6 +95,15 @@ if cargo install --git "$REPO_URL" --force; then
     echo ""
     echo "Generate default config with:"
     echo "    rexit --init"
+    echo ""
+    echo "List available themes with:"
+    echo "    rexit --list-themes"
+    echo ""
+    echo "Use a theme with:"
+    echo "    rexit --theme dracula"
+    echo ""
+    echo "View the man page with:"
+    echo "    man rexit"
     echo ""
     echo "For more information, visit:"
     echo "    $REPO_URL"

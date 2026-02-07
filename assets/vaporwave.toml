@@ -1,0 +1,23 @@
+[colors]
+foreground = "#f8c8dc"
+background = "#2d1b4e"
+border = "#ff71ce"
+selected_fg = "#2d1b4e"
+selected_bg = "#ff71ce"
+selected_modifier = ["bold"]
+icon_color = "#01cdfe"
+help_fg = "#7a5a8c"
+help_key_fg = "#b967ff"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+animation_type = "synthwave"
+speed_ms = 75
+color = "#ff71ce"
+density = 50
+adaptive_quality = true
+min_speed_ms = 200

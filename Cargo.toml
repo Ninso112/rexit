@@ -1,6 +1,6 @@
 [package]
 name = "rexit"
-version = "1.1.5"
+version = "1.1.6"
 edition = "2021"
 authors = ["Ninso112"]
 description = "A rice-ready TUI power menu for Linux with multi-WM support"
@@ -18,6 +18,9 @@ serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 directories = "5.0"
 rand = "0.8"
+sysinfo = "0.30"
+lazy_static = "1.4"
+regex = "1.10"
 
 [profile.release]
 opt-level = "z"

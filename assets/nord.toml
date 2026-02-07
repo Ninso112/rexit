@@ -1,0 +1,23 @@
+[colors]
+foreground = "#D8DEE9"
+background = "#2E3440"
+border = "#88C0D0"
+selected_fg = "#2E3440"
+selected_bg = "#88C0D0"
+selected_modifier = ["bold"]
+icon_color = "#81A1C1"
+help_fg = "#4C566A"
+help_key_fg = "#5E81AC"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+animation_type = "snow"
+speed_ms = 100
+color = "#B48EAD"
+density = 40
+adaptive_quality = true
+min_speed_ms = 200

@@ -1,0 +1,23 @@
+[colors]
+foreground = "#a9b1d6"
+background = "#1a1b26"
+border = "#7aa2f7"
+selected_fg = "#1a1b26"
+selected_bg = "#7aa2f7"
+selected_modifier = ["bold"]
+icon_color = "#f7768e"
+help_fg = "#565f89"
+help_key_fg = "#bb9af7"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "rounded"
+
+[animation]
+animation_type = "matrix"
+speed_ms = 80
+color = "#9ece6a"
+density = 50
+adaptive_quality = true
+min_speed_ms = 200

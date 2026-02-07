@@ -1,0 +1,23 @@
+[colors]
+foreground = "#ffffff"
+background = "#000000"
+border = "#ffff00"
+selected_fg = "#000000"
+selected_bg = "#ffff00"
+selected_modifier = ["bold"]
+icon_color = "#00ffff"
+help_fg = "#ffffff"
+help_key_fg = "#ffff00"
+help_key_modifier = ["bold"]
+
+[border]
+enabled = true
+style = "thick"
+
+[animation]
+animation_type = "none"
+speed_ms = 200
+color = "#ffffff"
+density = 30
+adaptive_quality = true
+min_speed_ms = 500
