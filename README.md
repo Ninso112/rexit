@@ -65,12 +65,6 @@ sudo cp target/release/rexit /usr/local/bin/
 cp target/release/rexit ~/.local/bin/
 ```
 
-### Using Cargo
-
-```bash
-cargo install --git https://github.com/Ninso112/rexit
-```
-
 ## Usage
 
 Launch `rexit` from your terminal:
