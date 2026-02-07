@@ -39,3 +39,6 @@ coverage/
 
 # OS files
 Thumbs.db
+
+# AUR Package
+rexit-git/

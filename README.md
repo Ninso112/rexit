@@ -42,6 +42,24 @@ curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/Ninso112/
 
 This will download and install `rexit` using Cargo.
 
+### AUR (Arch Linux)
+
+rexit is available in the AUR as `rexit-git`.
+
+Using an AUR helper like `yay`:
+
+```bash
+yay -S rexit-git
+```
+
+Or manually:
+
+```bash
+git clone https://aur.archlinux.org/rexit-git.git
+cd rexit-git
+makepkg -si
+```
+
 ### Prerequisites
 
 - Rust 1.70 or higher
