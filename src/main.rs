@@ -19,7 +19,7 @@ use ratatui::{
     Frame, Terminal,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::io;
 use std::path::PathBuf;
@@ -158,7 +158,7 @@ pub struct ThemeConfig {
 #[derive(Debug, Clone)]
 pub struct PerformanceMonitor {
     last_check: Instant,
-    frame_times: Vec<u64>,
+    frame_times: VecDeque<u64>,
     degraded_mode: bool,
     last_frame_time: u64,
 }
@@ -167,7 +167,7 @@ impl PerformanceMonitor {
     pub fn new() -> Self {
         Self {
             last_check: Instant::now(),
-            frame_times: Vec::with_capacity(30),
+            frame_times: VecDeque::with_capacity(30),
             degraded_mode: false,
             last_frame_time: 0,
         }
@@ -175,9 +175,9 @@ impl PerformanceMonitor {
 
     pub fn record_frame(&mut self, frame_time_ms: u64) {
         self.last_frame_time = frame_time_ms;
-        self.frame_times.push(frame_time_ms);
+        self.frame_times.push_back(frame_time_ms);
         if self.frame_times.len() > 30 {
-            self.frame_times.remove(0);
+            self.frame_times.pop_front();
         }
     }
 
@@ -520,7 +520,18 @@ impl Default for Config {
 // ============================================================================
 
 fn parse_color(color_str: &str) -> Color {
-    match color_str.to_lowercase().as_str() {
+    // Fast path for hex colors — no allocation needed
+    if color_str.starts_with('#') && color_str.len() == 7 {
+        if let (Ok(r), Ok(g), Ok(b)) = (
+            u8::from_str_radix(&color_str[1..3], 16),
+            u8::from_str_radix(&color_str[3..5], 16),
+            u8::from_str_radix(&color_str[5..7], 16),
+        ) {
+            return Color::Rgb(r, g, b);
+        }
+        return Color::White;
+    }
+    match color_str.to_ascii_lowercase().as_str() {
         "black" => Color::Black,
         "red" => Color::Red,
         "green" => Color::Green,
@@ -537,18 +548,6 @@ fn parse_color(color_str: &str) -> Color {
         "lightmagenta" => Color::LightMagenta,
         "lightcyan" => Color::LightCyan,
         "white" => Color::White,
-        // RGB format: #RRGGBB
-        hex if hex.starts_with('#') && hex.len() == 7 => {
-            if let (Ok(r), Ok(g), Ok(b)) = (
-                u8::from_str_radix(&hex[1..3], 16),
-                u8::from_str_radix(&hex[3..5], 16),
-                u8::from_str_radix(&hex[5..7], 16),
-            ) {
-                Color::Rgb(r, g, b)
-            } else {
-                Color::White
-            }
-        }
         _ => Color::White,
     }
 }
@@ -569,6 +568,15 @@ fn parse_modifier(modifiers: &[String]) -> Modifier {
         }
     }
     result
+}
+
+fn parse_title_alignment(s: &str) -> Alignment {
+    match s {
+        "left" => Alignment::Left,
+        "center" => Alignment::Center,
+        "right" => Alignment::Right,
+        _ => Alignment::Center,
+    }
 }
 
 // ============================================================================
@@ -1227,7 +1235,7 @@ struct AnimationState {
     /// Flow field particles
     flow_particles: Vec<FlowParticle>,
     /// Morse code
-    morse_message: String,
+    morse_message: Vec<char>,
     morse_idx: usize,
     morse_timer: u8,
     morse_display: String,
@@ -1744,9 +1752,8 @@ impl App {
 
         // Update logout command based on detected WM
         for action in &mut actions {
-            if action.label.to_lowercase().contains("logout")
-                || action.label.to_lowercase().contains("exit")
-            {
+            let label_lower = action.label.to_lowercase();
+            if label_lower.contains("logout") || label_lower.contains("exit") {
                 let (cmd, args) = get_logout_command(&config.wm_type);
                 if !cmd.is_empty() {
                     action.command = cmd;
@@ -2355,7 +2362,7 @@ impl AnimationState {
             vortex_angle: 0.0,
             traces: Vec::new(),
             flow_particles: Vec::new(),
-            morse_message: String::new(),
+            morse_message: Vec::new(),
             morse_idx: 0,
             morse_timer: 0,
             morse_display: String::new(),
@@ -2732,7 +2739,7 @@ impl AnimationState {
                 }
             }
             "morse" => {
-                self.morse_message = "I'd just like to interject for a moment. What you're refering to as Linux, is in fact, GNU/Linux, or as I've recently taken to calling it, GNU plus Linux. Linux is not an operating system unto itself, but rather another free component of a fully functioning GNU system made useful by the GNU corelibs, shell utilities and vital system components comprising a full OS as defined by POSIX. Many computer users run a modified version of the GNU system every day, without realizing it. Through a peculiar turn of events, the version of GNU which is widely used today is often called Linux, and many of its users are not aware that it is basically the GNU system, developed by the GNU Project. There really is a Linux, and these people are using it, but it is just a part of the system they use. Linux is the kernel: the program in the system that allocates the machine's resources to the other programs that you run. The kernel is an essential part of an operating system, but useless by itself; it can only function in the context of a complete operating system. Linux is normally used in combination with the GNU operating system: the whole system is basically GNU with Linux added, or GNU/Linux. All the so-called Linux distributions are really distributions of GNU/Linux!".to_string();
+                self.morse_message = "I'd just like to interject for a moment. What you're refering to as Linux, is in fact, GNU/Linux, or as I've recently taken to calling it, GNU plus Linux. Linux is not an operating system unto itself, but rather another free component of a fully functioning GNU system made useful by the GNU corelibs, shell utilities and vital system components comprising a full OS as defined by POSIX. Many computer users run a modified version of the GNU system every day, without realizing it. Through a peculiar turn of events, the version of GNU which is widely used today is often called Linux, and many of its users are not aware that it is basically the GNU system, developed by the GNU Project. There really is a Linux, and these people are using it, but it is just a part of the system they use. Linux is the kernel: the program in the system that allocates the machine's resources to the other programs that you run. The kernel is an essential part of an operating system, but useless by itself; it can only function in the context of a complete operating system. Linux is normally used in combination with the GNU operating system: the whole system is basically GNU with Linux added, or GNU/Linux. All the so-called Linux distributions are really distributions of GNU/Linux!".chars().collect();
                 self.morse_idx = 0;
                 self.morse_timer = 0;
                 self.morse_display = String::new();
@@ -3601,7 +3608,7 @@ impl AnimationState {
         }
 
         if self.morse_idx < self.morse_message.len() {
-            let ch = self.morse_message.chars().nth(self.morse_idx).unwrap();
+            let ch = self.morse_message[self.morse_idx];
 
             // Get morse code for character
             let morse = match ch.to_ascii_uppercase() {
@@ -5821,20 +5828,9 @@ fn render_vertical_layout(f: &mut Frame, app: &App, size: Rect, auto_scale: bool
         .collect();
 
     // Create border style
-    let border_type = match config.border.style.as_str() {
-        "plain" => Borders::ALL,
-        "rounded" => Borders::ALL,
-        "double" => Borders::ALL,
-        "thick" => Borders::ALL,
-        _ => Borders::ALL,
-    };
+    let border_type = Borders::ALL;
 
-    let title_alignment = match config.title_alignment.as_str() {
-        "left" => Alignment::Left,
-        "center" => Alignment::Center,
-        "right" => Alignment::Right,
-        _ => Alignment::Center,
-    };
+    let title_alignment = parse_title_alignment(&config.title_alignment);
 
     let list = List::new(items)
         .block(
@@ -5844,7 +5840,7 @@ fn render_vertical_layout(f: &mut Frame, app: &App, size: Rect, auto_scale: bool
                 } else {
                     Borders::NONE
                 })
-                .title(config.title.clone())
+                .title(config.title.as_str())
                 .title_alignment(title_alignment)
                 .border_style(Style::default().fg(border_color)),
         )
@@ -5880,20 +5876,9 @@ fn render_horizontal_layout(f: &mut Frame, app: &App, size: Rect) {
     };
 
     // Create border
-    let border_type = match config.border.style.as_str() {
-        "plain" => Borders::ALL,
-        "rounded" => Borders::ALL,
-        "double" => Borders::ALL,
-        "thick" => Borders::ALL,
-        _ => Borders::ALL,
-    };
+    let border_type = Borders::ALL;
 
-    let title_alignment = match config.title_alignment.as_str() {
-        "left" => Alignment::Left,
-        "center" => Alignment::Center,
-        "right" => Alignment::Right,
-        _ => Alignment::Center,
-    };
+    let title_alignment = parse_title_alignment(&config.title_alignment);
 
     let block = Block::default()
         .borders(if config.border.enabled {
@@ -5901,7 +5886,7 @@ fn render_horizontal_layout(f: &mut Frame, app: &App, size: Rect) {
         } else {
             Borders::NONE
         })
-        .title(config.title.clone())
+        .title(config.title.as_str())
         .title_alignment(title_alignment)
         .border_style(Style::default().fg(border_color));
 
@@ -5971,20 +5956,9 @@ fn render_grid_layout(f: &mut Frame, app: &App, size: Rect) {
     };
 
     // Create border
-    let border_type = match config.border.style.as_str() {
-        "plain" => Borders::ALL,
-        "rounded" => Borders::ALL,
-        "double" => Borders::ALL,
-        "thick" => Borders::ALL,
-        _ => Borders::ALL,
-    };
+    let border_type = Borders::ALL;
 
-    let title_alignment = match config.title_alignment.as_str() {
-        "left" => Alignment::Left,
-        "center" => Alignment::Center,
-        "right" => Alignment::Right,
-        _ => Alignment::Center,
-    };
+    let title_alignment = parse_title_alignment(&config.title_alignment);
 
     let block = Block::default()
         .borders(if config.border.enabled {
@@ -5992,7 +5966,7 @@ fn render_grid_layout(f: &mut Frame, app: &App, size: Rect) {
         } else {
             Borders::NONE
         })
-        .title(config.title.clone())
+        .title(config.title.as_str())
         .title_alignment(title_alignment)
         .border_style(Style::default().fg(border_color));
 
@@ -6061,20 +6035,9 @@ fn render_compact_layout(f: &mut Frame, app: &App, size: Rect) {
     };
 
     // Create border
-    let border_type = match config.border.style.as_str() {
-        "plain" => Borders::ALL,
-        "rounded" => Borders::ALL,
-        "double" => Borders::ALL,
-        "thick" => Borders::ALL,
-        _ => Borders::ALL,
-    };
+    let border_type = Borders::ALL;
 
-    let title_alignment = match config.title_alignment.as_str() {
-        "left" => Alignment::Left,
-        "center" => Alignment::Center,
-        "right" => Alignment::Right,
-        _ => Alignment::Center,
-    };
+    let title_alignment = parse_title_alignment(&config.title_alignment);
 
     let block = Block::default()
         .borders(if config.border.enabled {
@@ -6082,7 +6045,7 @@ fn render_compact_layout(f: &mut Frame, app: &App, size: Rect) {
         } else {
             Borders::NONE
         })
-        .title(config.title.clone())
+        .title(config.title.as_str())
         .title_alignment(title_alignment)
         .border_style(Style::default().fg(border_color));
 
@@ -6125,7 +6088,9 @@ fn render_compact_layout(f: &mut Frame, app: &App, size: Rect) {
 
 fn render_confirmation_dialog(f: &mut Frame, app: &App, action_index: usize, size: Rect) {
     let config = &app.config;
-    let action = app.actions.get(action_index).unwrap();
+    let Some(action) = app.actions.get(action_index) else {
+        return;
+    };
 
     // Parse colors
     let fg_color = parse_color(&config.colors.foreground);
@@ -6150,14 +6115,11 @@ fn render_confirmation_dialog(f: &mut Frame, app: &App, action_index: usize, siz
     };
 
     // Clear background under dialog
-    let clear = Block::default().style(Style::default().bg(parse_color("black")));
+    let clear = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(clear, dialog_area);
 
     // Create dialog border
-    let border_type = match config.border.style.as_str() {
-        "rounded" => Borders::ALL,
-        _ => Borders::ALL,
-    };
+    let border_type = Borders::ALL;
 
     let block = Block::default()
         .borders(border_type)
@@ -6224,7 +6186,9 @@ fn render_grace_period(
     size: Rect,
 ) {
     let config = &app.config;
-    let action = app.actions.get(action_index).unwrap();
+    let Some(action) = app.actions.get(action_index) else {
+        return;
+    };
 
     // Parse colors
     let fg_color = parse_color(&config.colors.foreground);
@@ -6253,14 +6217,11 @@ fn render_grace_period(
     };
 
     // Clear background under dialog
-    let clear = Block::default().style(Style::default().bg(parse_color("black")));
+    let clear = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(clear, dialog_area);
 
     // Create dialog border
-    let border_type = match config.border.style.as_str() {
-        "rounded" => Borders::ALL,
-        _ => Borders::ALL,
-    };
+    let border_type = Borders::ALL;
 
     let block = Block::default()
         .borders(border_type)
@@ -6285,7 +6246,7 @@ fn render_grace_period(
     f.render_widget(icon_paragraph, icon_area);
 
     // Render message
-    let message_paragraph = Paragraph::new(message.clone())
+    let message_paragraph = Paragraph::new(message)
         .alignment(Alignment::Center)
         .style(Style::default().fg(fg_color).add_modifier(Modifier::BOLD));
     let message_area = Rect {
@@ -6367,14 +6328,11 @@ fn render_animation_menu(f: &mut Frame, app: &App, size: Rect) {
     };
 
     // Clear background under menu
-    let clear = Block::default().style(Style::default().bg(parse_color("black")));
+    let clear = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(clear, menu_area);
 
     // Create border
-    let border_type = match config.border.style.as_str() {
-        "rounded" => Borders::ALL,
-        _ => Borders::ALL,
-    };
+    let border_type = Borders::ALL;
 
     let block = Block::default()
         .borders(border_type)
@@ -6567,7 +6525,7 @@ fn render_matrix(
     rainbow: bool,
 ) {
     // Fill background with black first to avoid gray stripes
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     // Build each line of the matrix
@@ -6620,7 +6578,7 @@ fn render_matrix(
 
                     // Store at correct x position
                     while line_chars.len() <= col.x as usize {
-                        line_chars.push((' ', parse_color("black")));
+                        line_chars.push((' ', Color::Black));
                     }
                     line_chars[col.x as usize] = (ch, char_color);
                 }
@@ -6635,7 +6593,7 @@ fn render_matrix(
 
         if !spans.is_empty() {
             let text = Line::from(spans);
-            let paragraph = Paragraph::new(text).style(Style::default().bg(parse_color("black")));
+            let paragraph = Paragraph::new(text).style(Style::default().bg(Color::Black));
             let area = Rect::new(0, y, size.width, 1);
             f.render_widget(paragraph, area);
         }
@@ -6644,7 +6602,7 @@ fn render_matrix(
 
 fn render_rain(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
     // Fill background with black first to avoid gray stripes
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for drop in &state.rain_drops {
@@ -6728,7 +6686,7 @@ fn render_thunder(f: &mut Frame, state: &AnimationState, size: Rect, _color: Col
 
 fn render_snow(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
     // Fill background with black first to avoid gray stripes
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for flake in &state.snow_flakes {
@@ -6758,7 +6716,7 @@ fn render_snow(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, 
 
 fn render_stars(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
     // Fill background with black first to avoid gray stripes
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for star in &state.stars {
@@ -6790,7 +6748,7 @@ fn render_fireflies(
     rainbow: bool,
 ) {
     // Fill background with black first to avoid gray stripes
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for (i, firefly) in state.fireflies.iter().enumerate() {
@@ -6822,7 +6780,7 @@ fn render_fireflies(
 }
 
 fn render_bubbles(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for bubble in &state.bubbles {
@@ -6853,7 +6811,7 @@ fn render_bubbles(f: &mut Frame, state: &AnimationState, size: Rect, color: Colo
 }
 
 fn render_confetti(f: &mut Frame, state: &AnimationState, size: Rect, _bg: Color) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for conf in &state.confetti {
@@ -6878,7 +6836,7 @@ fn render_confetti(f: &mut Frame, state: &AnimationState, size: Rect, _bg: Color
 }
 
 fn render_wave(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, _bg: Color) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for y in 0..size.height {
@@ -6918,7 +6876,7 @@ fn render_wave(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, 
 }
 
 fn render_particles(f: &mut Frame, state: &AnimationState, size: Rect, _bg: Color) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for particle in &state.particles {
@@ -6953,7 +6911,7 @@ fn render_digital_rain(
     _bg: Color,
     rainbow: bool,
 ) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     let hex_chars = "0123456789ABCDEF";
@@ -7027,7 +6985,7 @@ fn render_heartbeat(f: &mut Frame, app: &App, size: Rect, _bg: Color) {
 }
 
 fn render_plasma(f: &mut Frame, state: &AnimationState, size: Rect) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for cell in &state.plasma {
@@ -7175,7 +7133,7 @@ fn render_autumn(f: &mut Frame, state: &AnimationState, size: Rect) {
 }
 
 fn render_dna(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     // Define multiple helix center positions based on terminal width
@@ -7370,7 +7328,7 @@ fn render_synthwave(f: &mut Frame, state: &AnimationState, size: Rect, _color: C
 }
 
 fn render_smoke(f: &mut Frame, state: &AnimationState, size: Rect) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for particle in &state.smoke {
@@ -7545,7 +7503,7 @@ fn render_typing_code(f: &mut Frame, state: &AnimationState, size: Rect, color: 
 }
 
 fn render_vortex(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     let center_x = size.width as f32 / 2.0;
@@ -7622,7 +7580,7 @@ fn render_circuit(f: &mut Frame, state: &AnimationState, size: Rect, color: Colo
 }
 
 fn render_flow_field(f: &mut Frame, state: &AnimationState, size: Rect) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for particle in &state.flow_particles {
@@ -7663,7 +7621,7 @@ fn render_morse(f: &mut Frame, state: &AnimationState, size: Rect, color: Color)
 
     // Show current character being transmitted
     if state.morse_idx < state.morse_message.len() {
-        let current_ch = state.morse_message.chars().nth(state.morse_idx).unwrap();
+        let current_ch = state.morse_message[state.morse_idx];
         let status = format!("Transmitting: {}", current_ch);
         let span = Span::styled(status, Style::default().fg(Color::Rgb(100, 100, 100)));
         let text = Line::from(vec![span]);
@@ -7674,7 +7632,7 @@ fn render_morse(f: &mut Frame, state: &AnimationState, size: Rect, color: Color)
 }
 
 fn render_lissajous(f: &mut Frame, state: &AnimationState, size: Rect) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     let center_x = size.width as f32 / 2.0;
@@ -7704,7 +7662,7 @@ fn render_lissajous(f: &mut Frame, state: &AnimationState, size: Rect) {
 }
 
 fn render_game_of_life(f: &mut Frame, state: &AnimationState, size: Rect) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     let width = state.gol_width;
@@ -7742,7 +7700,7 @@ fn render_matrix_cjk(
     _bg: Color,
     rainbow: bool,
 ) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     // CJK characters for authentic Matrix feel
@@ -7824,7 +7782,7 @@ fn render_matrix_cjk(
 }
 
 fn render_fireworks(f: &mut Frame, state: &AnimationState, size: Rect, _bg: Color) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     for firework in &state.fireworks {
@@ -7879,7 +7837,7 @@ fn render_fireworks(f: &mut Frame, state: &AnimationState, size: Rect, _bg: Colo
 }
 
 fn render_neon_grid(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     let offset = state.neon_offset;
@@ -7941,7 +7899,7 @@ fn noise(x: f32, y: f32) -> f32 {
 }
 
 fn render_perlin_flow(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     let offset = state.perlin_offset;
@@ -7984,7 +7942,7 @@ fn render_perlin_flow(f: &mut Frame, state: &AnimationState, size: Rect, color: 
 }
 
 fn render_cube_3d(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     let center_x = size.width as f32 / 2.0;
@@ -8088,7 +8046,7 @@ fn render_cube_3d(f: &mut Frame, state: &AnimationState, size: Rect, color: Colo
 }
 
 fn render_fractals(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
-    let bg_fill = Block::default().style(Style::default().bg(parse_color("black")));
+    let bg_fill = Block::default().style(Style::default().bg(Color::Black));
     f.render_widget(bg_fill, size);
 
     // Render a simple Mandelbrot-like pattern
