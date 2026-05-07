@@ -1061,8 +1061,12 @@ impl Action {
         let mut cmd = Command::new(&self.command);
         cmd.args(&self.args);
 
-        cmd.status()
+        let status = cmd.status()
             .with_context(|| format!("Failed to execute command: {}", self.command))?;
+        
+        if !status.success() {
+            anyhow::bail!("Command {} exited with status: {}", self.command, status);
+        }
 
         Ok(())
     }
@@ -1682,7 +1686,7 @@ impl App {
             } else {
                 // Wrap to bottom of same column
                 let total_rows = self.actions.len().div_ceil(cols);
-                let new_row = (total_rows - 1).min(current_row);
+                let new_row = total_rows.saturating_sub(1);
                 self.selected_index = (new_row * cols + current_col).min(self.actions.len() - 1);
             }
         }
@@ -2153,7 +2157,7 @@ impl App {
             "rain" => self.animation_state.update_rain(area, &self.config),
             "thunder" => self.animation_state.update_thunder(),
             "snow" => self.animation_state.update_snow(area, &self.config),
-            "stars" => self.animation_state.update_stars(&self.config),
+            "stars" => self.animation_state.update_stars(area, &self.config),
             "fireflies" => self.animation_state.update_fireflies(area, &self.config),
             "bubbles" => self.animation_state.update_bubbles(area, &self.config),
             "confetti" => self.animation_state.update_confetti(area, &self.config),
@@ -2252,7 +2256,12 @@ impl EasterEggState {
     }
 
     fn check_konami(&mut self, key: KeyCode) -> bool {
-        self.sequence.push(key);
+        // Normalize character keys to lowercase for consistent matching
+        let normalized = match key {
+            KeyCode::Char(c) => KeyCode::Char(c.to_lowercase().next().unwrap_or(c)),
+            other => other,
+        };
+        self.sequence.push(normalized);
         // Keep only the last N keys where N is the length of the konami code
         while self.sequence.len() > self.konami_code.len() {
             self.sequence.remove(0);
@@ -3233,7 +3242,7 @@ impl AnimationState {
         }
     }
 
-    fn update_stars(&mut self, config: &Config) {
+    fn update_stars(&mut self, area: Rect, config: &Config) {
         use rand::Rng;
         let mut rng = rand::thread_rng();
 
@@ -3244,11 +3253,11 @@ impl AnimationState {
 
         // Occasionally add/remove stars
         if self.tick.is_multiple_of(60) && rng.gen_bool(0.1) {
-            let target_count = ((200 * config.animation.density as usize) / 100).max(5);
+            let target_count = ((area.width as usize * area.height as usize * config.animation.density as usize) / 300).max(5);
             if self.stars.len() < target_count && !self.stars.is_empty() {
                 self.stars.push(Star {
-                    x: rng.gen_range(0..200),
-                    y: rng.gen_range(0..60),
+                    x: rng.gen_range(0..area.width),
+                    y: rng.gen_range(0..area.height),
                     brightness: rng.gen_range(50..255),
                     twinkle_speed: rng.gen_range(0.05..0.2),
                     twinkle_offset: rng.gen_range(0.0..std::f32::consts::TAU),
@@ -4093,7 +4102,7 @@ impl AnimationState {
         let cy = area.height as f32 / 2.0;
         self.satellite.x = cx + self.satellite.angle.cos() * self.satellite.orbit_radius;
         self.satellite.y = cy + self.satellite.angle.sin() * self.satellite.orbit_radius * 0.5;
-        self.satellite.signal_timer = self.satellite.signal_timer.saturating_sub(1);
+        self.satellite.signal_timer = (self.satellite.signal_timer + 1) % 40;
     }
 
     fn update_pulsar(&mut self) {
@@ -4101,8 +4110,6 @@ impl AnimationState {
     }
 
     fn update_pong(&mut self, area: Rect, _config: &Config) {
-        // fog uses randomness in render
-
         // Move ball
         self.pong.ball_x += self.pong.ball_vx;
         self.pong.ball_y += self.pong.ball_vy;
@@ -4212,8 +4219,6 @@ impl AnimationState {
     }
 
     fn update_invaders(&mut self, area: Rect, _config: &Config) {
-        // paint_splatter uses randomness in render
-
         let move_down = self.invaders.iter().any(|i| {
             (i.x <= 2.0 && i.direction < 0) || (i.x >= area.width as f32 - 3.0 && i.direction > 0)
         });
@@ -5565,8 +5570,10 @@ fn render_stained_glass(f: &mut Frame, state: &AnimationState, size: Rect) {
         // Draw panel with border
         for py in y..(y + h).min(size.height) {
             for px in x..(x + w).min(size.width) {
-                let ch = if px == x || px == x + w - 1 || py == y || py == y + h - 1 {
+                let ch = if px == x || px == x + w - 1 {
                     '│'
+                } else if py == y || py == y + h - 1 {
+                    '─'
                 } else {
                     '█'
                 };
@@ -5659,16 +5666,9 @@ fn render_glitch(f: &mut Frame, state: &AnimationState, size: Rect) {
 
 fn render_old_film(f: &mut Frame, state: &AnimationState, size: Rect) {
     // Sepia background
-    for y in 0..size.height {
-        let sepia = Color::Rgb(120, 100, 70);
-        let spans: Vec<Span> = (0..size.width)
-            .map(|_| Span::styled("█", Style::default().fg(sepia)))
-            .collect();
-        let text = Line::from(spans);
-        let paragraph = Paragraph::new(text);
-        let area = Rect::new(0, y, size.width, 1);
-        f.render_widget(paragraph, area);
-    }
+    let sepia = Color::Rgb(120, 100, 70);
+    let bg_fill = Block::default().style(Style::default().bg(sepia));
+    f.render_widget(bg_fill, size);
 
     // Scratches
     for scratch in &state.scratches {
@@ -5796,9 +5796,9 @@ fn ui(f: &mut Frame, app: &mut App) {
 fn render_vertical_layout(f: &mut Frame, app: &App, size: Rect, auto_scale: bool) {
     let config = &app.config;
     let center_area = if auto_scale {
-        calculate_auto_layout(f, app, size)
+        calculate_auto_layout(app, size)
     } else {
-        calculate_fixed_layout(f, app, size)
+        calculate_fixed_layout(app, size)
     };
 
     // Parse colors
@@ -6101,7 +6101,7 @@ fn render_confirmation_dialog(f: &mut Frame, app: &App, action_index: usize, siz
 
     // Calculate dialog size
     let message = format!("Confirm {}?", action.label);
-    let width = (message.len() as u16 + 10).max(30).min(size.width - 4);
+    let width = (message.chars().count() as u16 + 10).max(30).min(size.width - 4);
     let height = 7u16;
 
     let x = (size.width.saturating_sub(width)) / 2;
@@ -6203,7 +6203,7 @@ fn render_grace_period(
         .replace("{seconds}", &remaining_secs.to_string());
 
     // Calculate dialog size
-    let width = (message.len() as u16 + 10).max(40).min(size.width - 4);
+    let width = (message.chars().count() as u16 + 10).max(40).min(size.width - 4);
     let height = 9u16;
 
     let x = (size.width.saturating_sub(width)) / 2;
@@ -6606,6 +6606,9 @@ fn render_rain(f: &mut Frame, state: &AnimationState, size: Rect, color: Color, 
     f.render_widget(bg_fill, size);
 
     for drop in &state.rain_drops {
+        if drop.y < 0.0 {
+            continue;
+        }
         let y = drop.y as u16;
         if y < size.height {
             let rain_char = if drop.speed > 1.5 { "│" } else { "┆" };
@@ -7115,6 +7118,9 @@ fn render_autumn(f: &mut Frame, state: &AnimationState, size: Rect) {
     ];
 
     for leaf in &state.leaves {
+        if leaf.y < 0.0 {
+            continue;
+        }
         let y = leaf.y as u16;
         let x = leaf.x as u16;
 
@@ -7145,6 +7151,9 @@ fn render_dna(f: &mut Frame, state: &AnimationState, size: Rect, color: Color) {
         let phase_offset = helix_idx as f32 * 1.5; // Offset phase for visual variety
 
         for base in &state.dna {
+            if base.y < 0.0 {
+                continue;
+            }
             let y = base.y as u16;
             if y >= size.height {
                 continue;
@@ -7979,12 +7988,15 @@ fn render_cube_3d(f: &mut Frame, state: &AnimationState, size: Rect, color: Colo
 
     let angle_x = state.cube_rotation.angle_x;
     let angle_y = state.cube_rotation.angle_y;
+    let angle_z = state.cube_rotation.angle_z;
 
     // Rotation matrices
     let cos_x = angle_x.cos();
     let sin_x = angle_x.sin();
     let cos_y = angle_y.cos();
     let sin_y = angle_y.sin();
+    let cos_z = angle_z.cos();
+    let sin_z = angle_z.sin();
 
     // Transform vertices
     let mut transformed: Vec<(f32, f32)> = Vec::new();
@@ -7997,11 +8009,15 @@ fn render_cube_3d(f: &mut Frame, state: &AnimationState, size: Rect, color: Colo
         let x2 = x * cos_y + z1 * sin_y;
         let z2 = -x * sin_y + z1 * cos_y;
 
+        // Rotate around Z
+        let x3 = x2 * cos_z - y1 * sin_z;
+        let y3 = x2 * sin_z + y1 * cos_z;
+
         // Project to 2D
         let distance = 4.0;
         let factor = distance / (distance + z2);
-        let px = center_x + x2 * scale * factor;
-        let py = center_y + y1 * scale * factor * 0.5; // 0.5 for aspect ratio correction
+        let px = center_x + x3 * scale * factor;
+        let py = center_y + y3 * scale * factor * 0.5; // 0.5 for aspect ratio correction
 
         transformed.push((px, py));
     }
@@ -8100,7 +8116,7 @@ fn render_fractals(f: &mut Frame, state: &AnimationState, size: Rect, color: Col
     }
 }
 
-fn calculate_auto_layout(_f: &mut Frame, app: &App, size: Rect) -> Rect {
+fn calculate_auto_layout(app: &App, size: Rect) -> Rect {
     let config = &app.config;
 
     // Calculate content dimensions
@@ -8147,7 +8163,7 @@ fn calculate_auto_layout(_f: &mut Frame, app: &App, size: Rect) -> Rect {
     }
 }
 
-fn calculate_fixed_layout(_f: &mut Frame, app: &App, size: Rect) -> Rect {
+fn calculate_fixed_layout(app: &App, size: Rect) -> Rect {
     let config = &app.config;
 
     // Calculate layout using percentage-based margins
@@ -8620,12 +8636,54 @@ fn handle_mouse_input(app: &mut App, mouse: MouseEvent) -> Result<()> {
                         && mouse.row >= menu_area.y
                         && mouse.row < menu_area.y + menu_area.height
                     {
-                        // Calculate which item was clicked
-                        let relative_y = mouse.row.saturating_sub(menu_area.y);
-                        let border_offset = if app.config.border.enabled { 1 } else { 0 };
-                        let padding = app.config.layout.padding;
-                        let item_index =
-                            (relative_y.saturating_sub(border_offset + padding)) as usize;
+                        // Calculate which item was clicked based on layout mode
+                        let item_index = match app.config.layout_mode.as_str() {
+                            "horizontal" | "compact" => {
+                                let inner = if app.config.border.enabled {
+                                    Rect::new(
+                                        menu_area.x + 1,
+                                        menu_area.y + 1,
+                                        menu_area.width.saturating_sub(2),
+                                        menu_area.height.saturating_sub(2),
+                                    )
+                                } else {
+                                    menu_area
+                                };
+                                let item_width = if app.config.layout_mode == "compact" { 5u16 } else { 15u16 };
+                                let relative_x = mouse.column.saturating_sub(inner.x);
+                                (relative_x as usize / item_width as usize)
+                                    .min(app.actions.len().saturating_sub(1))
+                            }
+                            "grid" => {
+                                let grid_cols = 2usize;
+                                let cell_width = 20u16;
+                                let cell_height = 4u16;
+                                let inner = if app.config.border.enabled {
+                                    Rect::new(
+                                        menu_area.x + 1,
+                                        menu_area.y + 1,
+                                        menu_area.width.saturating_sub(2),
+                                        menu_area.height.saturating_sub(2),
+                                    )
+                                } else {
+                                    menu_area
+                                };
+                                let relative_x = mouse.column.saturating_sub(inner.x);
+                                let relative_y = mouse.row.saturating_sub(inner.y);
+                                let col = (relative_x as usize / cell_width as usize)
+                                    .min(grid_cols.saturating_sub(1));
+                                let row = relative_y as usize / cell_height as usize;
+                                (row * grid_cols + col)
+                                    .min(app.actions.len().saturating_sub(1))
+                            }
+                            _ => {
+                                // vertical layout (default)
+                                let relative_y = mouse.row.saturating_sub(menu_area.y);
+                                let border_offset = if app.config.border.enabled { 1 } else { 0 };
+                                let padding = app.config.layout.padding;
+                                relative_y.saturating_sub(border_offset + padding) as usize
+                            }
+                        };
 
                         if item_index < app.actions.len() {
                             app.selected_index = item_index;
